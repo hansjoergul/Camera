@@ -1,225 +1,934 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Timelapse Camera</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Timelapse Overlay</title>
 <style>
-body {
-    margin:0;
-    background:black;
-    color:white;
-    font-family:system-ui;
-    overflow:hidden;
-}
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-#camera-container {
-    position:relative;
-    width:100vw;
-    height:100vh;
-    background:black;
-}
+  :root {
+    --ios-bg: #000;
+    --ios-surface: rgba(28,28,30,0.85);
+    --ios-surface2: rgba(44,44,46,0.9);
+    --ios-border: rgba(255,255,255,0.12);
+    --ios-text: #fff;
+    --ios-text2: rgba(255,255,255,0.6);
+    --ios-accent: #0A84FF;
+    --ios-yellow: #FFD60A;
+    --safe-bottom: env(safe-area-inset-bottom, 20px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
 
-video {
-    position:absolute;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-}
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    color: var(--ios-text);
+    position: fixed;
+    top: 0; left: 0;
+  }
 
-#overlay {
-    position:absolute;
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    opacity:0.5;
-    pointer-events:none;
-    transform-origin:center;
-}
+  /* ─── SCREENS ─── */
+  .screen { 
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+    transition: opacity 0.3s ease;
+  }
+  .screen.active { display: flex; }
 
-#controls {
-    position:absolute;
-    bottom:0;
-    width:100%;
-    background:rgba(0,0,0,0.6);
-    padding:12px;
-    box-sizing:border-box;
-}
+  /* ─── START SCREEN ─── */
+  #startScreen {
+    align-items: center; justify-content: center;
+    background: #000;
+    gap: 0;
+  }
 
-.control-row {
-    display:flex;
-    align-items:center;
-    gap:10px;
-    margin:6px 0;
-}
+  .start-icon {
+    width: 90px; height: 90px;
+    background: linear-gradient(145deg, #1c1c1e, #2c2c2e);
+    border-radius: 22px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+  .start-icon svg { width: 52px; height: 52px; }
 
-input[type=range] {
-    flex:1;
-}
+  .start-title {
+    font-size: 28px; font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .start-subtitle {
+    font-size: 15px; color: var(--ios-text2);
+    margin-bottom: 48px;
+    text-align: center; padding: 0 40px;
+    line-height: 1.4;
+  }
 
-#buttons {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-top:10px;
-}
+  .ios-btn {
+    background: var(--ios-accent);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 17px; font-weight: 600;
+    padding: 16px 0;
+    width: 280px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    letter-spacing: -0.2px;
+  }
+  .ios-btn:active { opacity: 0.7; }
+  .ios-btn.secondary {
+    background: var(--ios-surface2);
+    margin-top: 12px;
+  }
 
-#capture {
-    width:70px;
-    height:70px;
-    border-radius:50%;
-    border:6px solid white;
-    background:transparent;
-}
+  /* ─── CAMERA SCREEN ─── */
+  #cameraScreen {
+    background: #000;
+    position: relative;
+    overflow: hidden;
+  }
 
-#capture:active {
-    background:white;
-}
+  #videoContainer {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+  }
 
-#upload {
-    color:white;
-}
+  #videoEl {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
 
-canvas {
-    display:none;
-}
+  #overlayImg {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 100%; max-height: 100%;
+    width: 100%; height: 100%;
+    object-fit: contain;
+    opacity: 0.5;
+    pointer-events: none;
+    display: none;
+    transition: opacity 0.1s;
+  }
+
+  /* Flash effect */
+  #flashEl {
+    position: absolute; inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+    transition: opacity 0.05s;
+  }
+
+  /* Top bar */
+  #topBar {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: calc(var(--safe-top) + 12px) 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    z-index: 5;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+  }
+
+  .top-btn {
+    width: 36px; height: 36px;
+    border: none; background: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    transition: background 0.15s;
+  }
+  .top-btn:active { background: rgba(255,255,255,0.2); }
+
+  #opacityBadge {
+    background: rgba(0,0,0,0.5);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 13px; font-weight: 600;
+    color: var(--ios-yellow);
+    backdrop-filter: blur(10px);
+  }
+
+  /* Bottom controls */
+  #bottomControls {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding-bottom: calc(var(--safe-bottom) + 8px);
+    z-index: 5;
+    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
+  }
+
+  /* Slider area */
+  #sliderArea {
+    padding: 8px 24px 16px;
+  }
+
+  .slider-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 4px;
+  }
+  .slider-label {
+    font-size: 12px; font-weight: 500;
+    color: var(--ios-text2);
+    width: 18px; text-align: center;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1; height: 4px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px; height: 22px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+
+  /* Main buttons row */
+  #mainBtns {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px 8px;
+  }
+
+  /* Gallery thumbnail */
+  #galleryThumb {
+    width: 54px; height: 54px;
+    border-radius: 10px;
+    border: 2px solid rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.1);
+    overflow: hidden;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  #galleryThumb:active { opacity: 0.7; }
+  #galleryThumb img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  #galleryThumb svg { opacity: 0.5; }
+
+  /* Capture button */
+  #captureBtn {
+    width: 76px; height: 76px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    padding: 3px;
+    position: relative;
+    transition: transform 0.1s;
+    flex-shrink: 0;
+  }
+  #captureBtn:active { transform: scale(0.93); }
+  .capture-outer {
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .capture-inner {
+    width: 62px; height: 62px;
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  /* Upload button */
+  #uploadBtn {
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  #uploadBtn:active { background: rgba(255,255,255,0.3); }
+
+  #fileInput { display: none; }
+
+  /* ─── GALLERY SCREEN ─── */
+  #galleryScreen {
+    background: #000;
+    flex-direction: column;
+  }
+
+  #galleryHeader {
+    padding: calc(var(--safe-top) + 16px) 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 0.5px solid var(--ios-border);
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.95);
+    backdrop-filter: blur(20px);
+  }
+
+  #galleryHeader h2 {
+    font-size: 17px; font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+
+  .nav-btn {
+    background: none; border: none;
+    color: var(--ios-accent);
+    font-size: 17px; font-weight: 400;
+    cursor: pointer;
+    padding: 4px 0;
+    min-width: 50px;
+  }
+  .nav-btn:active { opacity: 0.5; }
+  .nav-btn.right { text-align: right; }
+
+  #photoCount {
+    font-size: 13px; color: var(--ios-text2);
+  }
+
+  #galleryGrid {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    align-content: start;
+    padding-bottom: calc(var(--safe-bottom) + 8px);
+  }
+
+  .photo-cell {
+    aspect-ratio: 1;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    background: #1c1c1e;
+  }
+  .photo-cell img {
+    width: 100%; height: 100%; object-fit: cover;
+    display: block;
+    transition: opacity 0.15s;
+  }
+  .photo-cell:active img { opacity: 0.7; }
+
+  .empty-gallery {
+    grid-column: 1/-1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 80px 40px;
+    gap: 12px;
+    color: var(--ios-text2);
+    text-align: center;
+  }
+  .empty-gallery svg { opacity: 0.3; }
+  .empty-gallery p { font-size: 15px; line-height: 1.5; }
+
+  /* ─── PHOTO VIEWER ─── */
+  #viewerScreen {
+    background: #000;
+    flex-direction: column;
+  }
+
+  #viewerHeader {
+    padding: calc(var(--safe-top) + 16px) 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(20px);
+  }
+
+  #viewerBody {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    background: #000;
+  }
+  #viewerBody img {
+    max-width: 100%; max-height: 100%;
+    object-fit: contain;
+  }
+
+  #viewerFooter {
+    padding: 16px 20px calc(var(--safe-bottom) + 16px);
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(20px);
+    flex-shrink: 0;
+  }
+
+  .viewer-action {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
+    background: none; border: none;
+    color: #fff; cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 10px;
+    transition: background 0.15s;
+  }
+  .viewer-action:active { background: rgba(255,255,255,0.15); }
+  .viewer-action span { font-size: 11px; color: var(--ios-text2); }
+  .viewer-action.danger { color: #FF453A; }
+  .viewer-action.danger span { color: #FF453A; }
+
+  #viewerDate {
+    font-size: 13px; color: var(--ios-text2);
+    text-align: center;
+  }
+
+  /* ─── CANVAS (hidden) ─── */
+  #captureCanvas { display: none; }
+
+  /* ─── PERMISSION SCREEN ─── */
+  #permissionScreen {
+    align-items: center; justify-content: center;
+    background: #000;
+    gap: 16px; padding: 40px;
+    text-align: center;
+  }
+  #permissionScreen .perm-icon {
+    font-size: 60px; margin-bottom: 8px;
+  }
+  #permissionScreen h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  #permissionScreen p { color: var(--ios-text2); font-size: 15px; line-height: 1.5; }
+
+  /* Rotate icon animation */
+  .rotating { animation: spin 0.4s ease; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(180deg); } }
+
+  /* Overlay visible indicator */
+  #overlayIndicator {
+    position: absolute;
+    top: calc(var(--safe-top) + 58px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 12px; color: var(--ios-yellow);
+    font-weight: 500;
+    display: none;
+    z-index: 5;
+  }
+
+  /* Count badge on gallery */
+  #galleryCountBadge {
+    position: absolute;
+    top: -4px; right: -4px;
+    background: var(--ios-accent);
+    color: #fff;
+    font-size: 10px; font-weight: 700;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    display: none;
+  }
+
+  /* Select mode */
+  .photo-cell.selected::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: rgba(10,132,255,0.3);
+    border: 2px solid var(--ios-accent);
+  }
+  .photo-cell .check {
+    position: absolute; bottom: 4px; right: 4px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--ios-accent);
+    border: 2px solid #fff;
+    display: none; align-items: center; justify-content: center;
+  }
+  .photo-cell.selected .check { display: flex; }
+
+  /* swipe hint */
+  .slider-hint {
+    text-align: center;
+    font-size: 11px; color: rgba(255,255,255,0.3);
+    margin-top: 2px; margin-bottom: 2px;
+  }
 </style>
 </head>
-
 <body>
 
-<div id="camera-container">
-
-    <video id="video" autoplay playsinline></video>
-
-    <img id="overlay">
-
-    <div id="controls">
-
-        <div class="control-row">
-            <label>Opacity</label>
-            <input id="opacity" type="range" min="0" max="100" value="50">
-        </div>
-
-        <div class="control-row">
-            <label>Scale</label>
-            <input id="scale" type="range" min="50" max="200" value="100">
-        </div>
-
-        <div id="buttons">
-            <input type="file" id="upload" accept="image/*">
-
-            <button id="capture"></button>
-        </div>
-
-    </div>
-
+<!-- ─── START SCREEN ─── -->
+<div id="startScreen" class="screen active">
+  <div class="start-icon">
+    <svg viewBox="0 0 52 52" fill="none">
+      <circle cx="26" cy="22" r="10" stroke="#FFD60A" stroke-width="2.5"/>
+      <path d="M8 42c0-9.94 8.06-18 18-18s18 8.06 18 18" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="32" y="8" width="14" height="10" rx="2" fill="none" stroke="white" stroke-width="2"/>
+      <circle cx="39" cy="13" r="2.5" fill="#0A84FF"/>
+      <path d="M32 11h-4" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="start-title">Timelapse Overlay</div>
+  <div class="start-subtitle">Halte dein Timelapse-Projekt konsistent – überlagere dein Live-Kamerabild mit einem Referenzfoto.</div>
+  <button class="ios-btn" id="startCameraBtn">Kamera starten</button>
+  <button class="ios-btn secondary" id="goToGalleryBtn">Galerie öffnen</button>
 </div>
 
-<canvas id="canvas"></canvas>
+<!-- ─── PERMISSION SCREEN ─── -->
+<div id="permissionScreen" class="screen">
+  <div class="perm-icon">📷</div>
+  <h2>Kamerazugriff nötig</h2>
+  <p>Diese App benötigt Zugriff auf deine Kamera, um das Live-Bild anzuzeigen.</p>
+  <button class="ios-btn" id="retryBtn" style="margin-top:12px">Erneut versuchen</button>
+  <button class="ios-btn secondary" id="backFromPermBtn">Zurück</button>
+</div>
+
+<!-- ─── CAMERA SCREEN ─── -->
+<div id="cameraScreen" class="screen">
+  <div id="videoContainer">
+    <video id="videoEl" autoplay playsinline muted></video>
+    <img id="overlayImg" alt="overlay">
+    <div id="flashEl"></div>
+  </div>
+
+  <div id="topBar">
+    <button class="top-btn" id="backBtn" title="Zurück">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M11 4L6 9L11 14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <div id="opacityBadge">50%</div>
+    <button class="top-btn" id="rotateBtn" title="Drehen">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <path d="M3 11C3 6.58 6.58 3 11 3c2.5 0 4.73 1.12 6.25 2.89" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <path d="M19 11c0 4.42-3.58 8-8 8-2.5 0-4.73-1.12-6.25-2.89" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <path d="M17.25 2.5v3.39H13.86" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4.75 19.5v-3.39H8.14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <div id="overlayIndicator">Referenzbild aktiv</div>
+
+  <div id="bottomControls">
+    <div id="sliderArea">
+      <div class="slider-row">
+        <span class="slider-label">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="5" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+            <circle cx="8" cy="8" r="2" fill="rgba(255,255,255,0.6)"/>
+          </svg>
+        </span>
+        <input type="range" id="opacitySlider" min="0" max="100" value="50">
+        <span class="slider-label" style="width:30px; font-size:11px; color:rgba(255,255,255,0.5);" id="opacityVal">50%</span>
+      </div>
+    </div>
+
+    <div id="mainBtns">
+      <!-- Gallery thumb -->
+      <div style="position:relative">
+        <div id="galleryThumb" title="Galerie">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="7" width="12" height="10" rx="2" stroke="white" stroke-width="1.5"/>
+            <path d="M17 9l4-2v10l-4-2V9z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div id="galleryCountBadge">0</div>
+      </div>
+
+      <!-- Capture -->
+      <button id="captureBtn" title="Foto aufnehmen">
+        <div class="capture-outer">
+          <div class="capture-inner"></div>
+        </div>
+      </button>
+
+      <!-- Upload overlay -->
+      <button id="uploadBtn" title="Referenzbild laden">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M12 16V8M9 11l3-3 3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="3" y="3" width="18" height="18" rx="3" stroke="white" stroke-width="1.5"/>
+          <path d="M8 19h8" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <input type="file" id="fileInput" accept="image/*">
+  <canvas id="captureCanvas"></canvas>
+</div>
+
+<!-- ─── GALLERY SCREEN ─── -->
+<div id="galleryScreen" class="screen">
+  <div id="galleryHeader">
+    <button class="nav-btn" id="galleryBackBtn">Zurück</button>
+    <div>
+      <h2>Aufnahmen</h2>
+      <div id="photoCount" style="text-align:center">0 Fotos</div>
+    </div>
+    <button class="nav-btn right" id="selectBtn">Auswählen</button>
+  </div>
+  <div id="galleryGrid"></div>
+  <div id="selectBar" style="display:none; padding: 12px 20px calc(var(--safe-bottom) + 12px); background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); display:none; flex-direction:row; align-items:center; justify-content:space-between;">
+    <button class="viewer-action danger" id="deleteSelectedBtn">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="#FF453A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Löschen</span>
+    </button>
+    <span id="selectedCount" style="font-size:13px;color:rgba(255,255,255,0.6)">0 ausgewählt</span>
+    <button class="viewer-action" id="downloadSelectedBtn">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3v13M8 12l4 4 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20h16" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>Laden</span>
+    </button>
+  </div>
+</div>
+
+<!-- ─── VIEWER SCREEN ─── -->
+<div id="viewerScreen" class="screen">
+  <div id="viewerHeader">
+    <button class="nav-btn" id="viewerBackBtn">Zurück</button>
+    <div id="viewerDate"></div>
+    <button class="nav-btn right" style="min-width:50px"></button>
+  </div>
+  <div id="viewerBody">
+    <img id="viewerImg" alt="">
+  </div>
+  <div id="viewerFooter">
+    <button class="viewer-action danger" id="deletePhotoBtn">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="#FF453A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Löschen</span>
+    </button>
+    <button class="viewer-action" id="downloadPhotoBtn">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 3v13M8 12l4 4 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20h16" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>Laden</span>
+    </button>
+  </div>
+</div>
 
 <script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const state = {
+  photos: [],         // [{dataUrl, filename, date}]
+  currentViewer: null,
+  stream: null,
+  overlayDataUrl: null,
+  isPortrait: true,
+  selectMode: false,
+  selected: new Set()
+};
 
-const video = document.getElementById("video")
-const overlay = document.getElementById("overlay")
-const opacitySlider = document.getElementById("opacity")
-const scaleSlider = document.getElementById("scale")
-const uploadInput = document.getElementById("upload")
-const captureButton = document.getElementById("capture")
-const canvas = document.getElementById("canvas")
-
-let stream = null
-
-async function startCamera() {
-
-    try {
-
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: { ideal: "environment" }
-            }
-        })
-
-        video.srcObject = stream
-
-    } catch (err) {
-
-        alert("Camera access required")
-
-    }
+// ─── SCREEN NAVIGATION ────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
 }
 
-startCamera()
+// ─── CAMERA ──────────────────────────────────────────────────────────────────
+async function startCamera() {
+  showScreen('cameraScreen');
+  try {
+    const constraints = {
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      },
+      audio: false
+    };
+    state.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    document.getElementById('videoEl').srcObject = state.stream;
+  } catch (e) {
+    showScreen('permissionScreen');
+  }
+}
 
+function stopCamera() {
+  if (state.stream) {
+    state.stream.getTracks().forEach(t => t.stop());
+    state.stream = null;
+  }
+}
 
-uploadInput.addEventListener("change", (e)=>{
+// ─── CAPTURE ─────────────────────────────────────────────────────────────────
+function capturePhoto() {
+  const video = document.getElementById('videoEl');
+  const canvas = document.getElementById('captureCanvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
-    const file = e.target.files[0]
-    if(!file) return
+  // Filename
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const filename = `timelapse_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.jpg`;
 
-    const reader = new FileReader()
+  state.photos.unshift({ dataUrl, filename, date: now });
+  updateGalleryThumb();
+  updateGalleryCountBadge();
 
-    reader.onload = function(event){
+  // Flash
+  const flash = document.getElementById('flashEl');
+  flash.style.opacity = 1;
+  setTimeout(() => { flash.style.opacity = 0; }, 80);
+}
 
-        overlay.src = event.target.result
+function updateGalleryThumb() {
+  const thumb = document.getElementById('galleryThumb');
+  if (state.photos.length > 0) {
+    thumb.innerHTML = `<img src="${state.photos[0].dataUrl}" alt="">`;
+  } else {
+    thumb.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="12" height="10" rx="2" stroke="white" stroke-width="1.5"/><path d="M17 9l4-2v10l-4-2V9z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  }
+}
 
-    }
+function updateGalleryCountBadge() {
+  const badge = document.getElementById('galleryCountBadge');
+  if (state.photos.length > 0) {
+    badge.textContent = state.photos.length > 99 ? '99+' : state.photos.length;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
 
-    reader.readAsDataURL(file)
+// ─── OVERLAY ─────────────────────────────────────────────────────────────────
+function setOverlay(dataUrl) {
+  const img = document.getElementById('overlayImg');
+  const indicator = document.getElementById('overlayIndicator');
+  if (dataUrl) {
+    img.src = dataUrl;
+    img.style.display = 'block';
+    indicator.style.display = 'block';
+    setTimeout(() => { indicator.style.display = 'none'; }, 2500);
+  } else {
+    img.style.display = 'none';
+    indicator.style.display = 'none';
+  }
+}
 
-})
+// ─── GALLERY ─────────────────────────────────────────────────────────────────
+function renderGallery() {
+  const grid = document.getElementById('galleryGrid');
+  const count = document.getElementById('photoCount');
+  count.textContent = `${state.photos.length} Foto${state.photos.length !== 1 ? 's' : ''}`;
 
+  if (state.photos.length === 0) {
+    grid.innerHTML = `<div class="empty-gallery">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="6" y="12" width="28" height="22" rx="4" stroke="white" stroke-width="2"/><circle cx="18" cy="23" r="4" stroke="white" stroke-width="2"/><path d="M34 18V10M30 14h8" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M10 34l8-8 5 5 5-6 6 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <p>Noch keine Fotos aufgenommen.<br>Öffne die Kamera und schieß los!</p>
+    </div>`;
+    return;
+  }
 
-opacitySlider.addEventListener("input", ()=>{
+  grid.innerHTML = state.photos.map((p, i) => `
+    <div class="photo-cell ${state.selected.has(i) ? 'selected' : ''}" data-index="${i}">
+      <img src="${p.dataUrl}" alt="">
+      <div class="check">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  `).join('');
 
-    const value = opacitySlider.value / 100
-    overlay.style.opacity = value
+  grid.querySelectorAll('.photo-cell').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const idx = parseInt(cell.dataset.index);
+      if (state.selectMode) {
+        toggleSelect(idx);
+      } else {
+        openViewer(idx);
+      }
+    });
+  });
+}
 
-})
+function toggleSelect(idx) {
+  if (state.selected.has(idx)) state.selected.delete(idx);
+  else state.selected.add(idx);
+  updateSelectBar();
+  renderGallery();
+}
 
+function updateSelectBar() {
+  const bar = document.getElementById('selectBar');
+  const selCount = document.getElementById('selectedCount');
+  selCount.textContent = `${state.selected.size} ausgewählt`;
+  if (state.selectMode) bar.style.display = 'flex';
+  else bar.style.display = 'none';
+}
 
-scaleSlider.addEventListener("input", ()=>{
+// ─── VIEWER ──────────────────────────────────────────────────────────────────
+function openViewer(index) {
+  state.currentViewer = index;
+  const photo = state.photos[index];
+  document.getElementById('viewerImg').src = photo.dataUrl;
+  const d = photo.date;
+  const pad = n => String(n).padStart(2,'0');
+  document.getElementById('viewerDate').textContent =
+    `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  showScreen('viewerScreen');
+}
 
-    const value = scaleSlider.value / 100
-    overlay.style.transform = `scale(${value})`
+function downloadPhoto(photo) {
+  const a = document.createElement('a');
+  a.href = photo.dataUrl;
+  a.download = photo.filename;
+  a.click();
+}
 
-})
+function deletePhoto(index) {
+  state.photos.splice(index, 1);
+  updateGalleryThumb();
+  updateGalleryCountBadge();
+}
 
+// ─── ORIENTATION ─────────────────────────────────────────────────────────────
+function toggleOrientation() {
+  const btn = document.getElementById('rotateBtn');
+  btn.classList.add('rotating');
+  setTimeout(() => btn.classList.remove('rotating'), 400);
 
-captureButton.addEventListener("click", ()=>{
+  if (screen.orientation && screen.orientation.lock) {
+    state.isPortrait = !state.isPortrait;
+    screen.orientation.lock(state.isPortrait ? 'portrait' : 'landscape').catch(() => {});
+  } else if (window.screen.orientation) {
+    // Fallback: just toggle class
+    document.body.style.transform = state.isPortrait ? 'rotate(90deg)' : '';
+    state.isPortrait = !state.isPortrait;
+  }
+}
 
-    const width = video.videoWidth
-    const height = video.videoHeight
+// ─── FILE UPLOAD ─────────────────────────────────────────────────────────────
+function handleFileUpload(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // Resize if too large
+      const MAX = 4096;
+      if (img.width > MAX || img.height > MAX) {
+        const canvas = document.createElement('canvas');
+        const ratio = Math.min(MAX / img.width, MAX / img.height);
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        state.overlayDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      } else {
+        state.overlayDataUrl = e.target.result;
+      }
+      setOverlay(state.overlayDataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
 
-    canvas.width = width
-    canvas.height = height
+// ─── EVENT LISTENERS ─────────────────────────────────────────────────────────
+document.getElementById('startCameraBtn').addEventListener('click', startCamera);
 
-    const ctx = canvas.getContext("2d")
+document.getElementById('goToGalleryBtn').addEventListener('click', () => {
+  renderGallery();
+  showScreen('galleryScreen');
+});
 
-    ctx.drawImage(video,0,0,width,height)
+document.getElementById('retryBtn').addEventListener('click', startCamera);
+document.getElementById('backFromPermBtn').addEventListener('click', () => showScreen('startScreen'));
 
-    canvas.toBlob((blob)=>{
+document.getElementById('backBtn').addEventListener('click', () => {
+  stopCamera();
+  showScreen('startScreen');
+});
 
-        const url = URL.createObjectURL(blob)
+document.getElementById('captureBtn').addEventListener('click', capturePhoto);
 
-        const a = document.createElement("a")
+document.getElementById('rotateBtn').addEventListener('click', toggleOrientation);
 
-        const now = new Date()
+document.getElementById('uploadBtn').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
 
-        const filename =
-        `timelapse_${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.jpg`
+document.getElementById('fileInput').addEventListener('change', e => {
+  handleFileUpload(e.target.files[0]);
+  e.target.value = '';
+});
 
-        a.href = url
-        a.download = filename
+document.getElementById('opacitySlider').addEventListener('input', e => {
+  const val = e.target.value;
+  document.getElementById('overlayImg').style.opacity = val / 100;
+  document.getElementById('opacityBadge').textContent = `${val}%`;
+  document.getElementById('opacityVal').textContent = `${val}%`;
+});
 
-        a.click()
+document.getElementById('galleryThumb').addEventListener('click', () => {
+  renderGallery();
+  showScreen('galleryScreen');
+});
 
-    },"image/jpeg",0.95)
+document.getElementById('galleryBackBtn').addEventListener('click', () => {
+  state.selectMode = false;
+  state.selected.clear();
+  document.getElementById('selectBtn').textContent = 'Auswählen';
+  document.getElementById('selectBar').style.display = 'none';
+  showScreen('cameraScreen');
+});
 
-})
+document.getElementById('selectBtn').addEventListener('click', () => {
+  state.selectMode = !state.selectMode;
+  state.selected.clear();
+  document.getElementById('selectBtn').textContent = state.selectMode ? 'Fertig' : 'Auswählen';
+  updateSelectBar();
+  renderGallery();
+});
 
+document.getElementById('deleteSelectedBtn').addEventListener('click', () => {
+  if (state.selected.size === 0) return;
+  const indices = Array.from(state.selected).sort((a,b) => b-a);
+  indices.forEach(i => deletePhoto(i));
+  state.selected.clear();
+  state.selectMode = false;
+  document.getElementById('selectBtn').textContent = 'Auswählen';
+  updateSelectBar();
+  renderGallery();
+});
+
+document.getElementById('downloadSelectedBtn').addEventListener('click', () => {
+  state.selected.forEach(i => downloadPhoto(state.photos[i]));
+});
+
+document.getElementById('viewerBackBtn').addEventListener('click', () => {
+  renderGallery();
+  showScreen('galleryScreen');
+});
+
+document.getElementById('downloadPhotoBtn').addEventListener('click', () => {
+  downloadPhoto(state.photos[state.currentViewer]);
+});
+
+document.getElementById('deletePhotoBtn').addEventListener('click', () => {
+  deletePhoto(state.currentViewer);
+  renderGallery();
+  showScreen('galleryScreen');
+});
+
+// Swipe back from viewer
+let touchStartX = 0;
+document.getElementById('viewerScreen').addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+});
+document.getElementById('viewerScreen').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (dx > 80 && touchStartX < 50) {
+    renderGallery();
+    showScreen('galleryScreen');
+  }
+});
 </script>
-
 </body>
 </html>
