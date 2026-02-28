@@ -133,12 +133,13 @@ html, body {
   transform: translateZ(0);
 }
 
-/* ── Overlay image: centered, contained ── */
+/* ── Overlay image: SAME cover behavior as video so scale matches exactly ── */
 #overlayImg {
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
-  object-fit: contain;
+  object-fit: cover;          /* ← must match video's object-fit: cover */
+  object-position: center;    /* ← must match video's default center anchor */
   opacity: 0.5;
   pointer-events: none;
   display: none;
@@ -326,13 +327,6 @@ input[type=range]::-webkit-slider-thumb {
   transform: translateX(-50%) translateY(0);
 }
 
-/* ── Rotate animation ── */
-@keyframes spin180 {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(180deg); }
-}
-.spin { animation: spin180 0.35s ease forwards; }
-
 /* ── Overlay active badge ── */
 #overlayActiveBadge {
   position: absolute;
@@ -348,6 +342,49 @@ input[type=range]::-webkit-slider-thumb {
   font-size: 12px; color: var(--yellow); font-weight: 600;
   pointer-events: none;
   display: none;
+}
+
+/* ── Photo preview modal (after capture) ── */
+#previewModal {
+  position: fixed; inset: 0;
+  background: #000;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+}
+#previewModal.open { display: flex; }
+
+#previewModalImg {
+  flex: 1;
+  width: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+#previewModalBar {
+  padding: 16px 24px calc(var(--safe-bottom) + 12px);
+  display: flex;
+  gap: 12px;
+  background: rgba(0,0,0,0.95);
+  flex-shrink: 0;
+}
+
+.save-btn {
+  flex: 1; padding: 16px;
+  border: none; border-radius: 13px;
+  font-size: 16px; font-weight: 600;
+  cursor: pointer; color: #fff;
+  transition: opacity 0.12s;
+}
+.save-btn:active { opacity: 0.65; }
+.save-btn-primary { background: var(--accent); }
+.save-btn-close   { background: rgba(255,255,255,0.12); flex: 0 0 auto; width: 56px; border-radius: 13px; }
+
+#previewLabel {
+  font-size: 12px; color: var(--text2);
+  text-align: center;
+  padding: 0 24px 8px;
+  line-height: 1.4;
 }
 
 /* ── Canvas (off-screen) ── */
@@ -410,14 +447,7 @@ input[type=range]::-webkit-slider-thumb {
       </svg>
     </button>
     <div id="opacityLabel">50%</div>
-    <button class="icon-btn" id="rotateBtn" title="Ausrichtung">
-      <svg id="rotateIcon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M3 12C3 7.03 7.03 3 12 3c2.77 0 5.25 1.24 6.95 3.2" stroke="white" stroke-width="2" stroke-linecap="round"/>
-        <path d="M21 12c0 4.97-4.03 9-9 9-2.77 0-5.25-1.24-6.95-3.2" stroke="white" stroke-width="2" stroke-linecap="round"/>
-        <path d="M18.95 1.5v4.7h-4.7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M5.05 22.5v-4.7h4.7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
+    <div style="width:40px"></div><!-- spacer -->
   </div>
 
   <!-- Bottom controls -->
@@ -467,14 +497,29 @@ input[type=range]::-webkit-slider-thumb {
     </div>
   </div>
 
-  <!-- Hidden file inputs -->
-  <!-- Reference image overlay: from gallery/files -->
+  <!-- Reference overlay file picker -->
   <input type="file" id="overlayInput" accept="image/*">
-  <!-- For opening last captured photo in device gallery -->
-  <input type="file" id="viewLastInput" accept="image/*" capture>
 
   <!-- Hidden canvas for capture -->
   <canvas id="canvas"></canvas>
+</div>
+
+<!-- ════ PHOTO PREVIEW MODAL ════ -->
+<div id="previewModal">
+  <img id="previewModalImg" alt="Aufnahme">
+  <div id="previewLabel">In Fotos sichern → tippe "In Fotos" im Teilen-Menü</div>
+  <div id="previewModalBar">
+    <!-- Close without saving -->
+    <button class="save-btn save-btn-close" id="previewCloseBtn">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M4 4l10 10M14 4L4 14" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <!-- Primary: share → "In Fotos sichern" -->
+    <button class="save-btn save-btn-primary" id="previewShareBtn">
+      📤 &nbsp;In Fotos sichern
+    </button>
+  </div>
 </div>
 
 <!-- ════ TOAST ════ -->
@@ -632,63 +677,106 @@ const Capture = {
   lastDataUrl: null,
   lastFilename: null,
 
-  async shoot() {
+  shoot() {
     const video = $('video');
     const canvas = $('canvas');
 
-    if (!video.videoWidth) {
-      showToast('Kamera nicht bereit');
+    if (!video.videoWidth || !video.videoHeight) {
+      showToast('Kamera noch nicht bereit');
       return;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // --- Determine visible crop (matching object-fit: cover rendering) ---
+    // The video element dimensions on screen:
+    const vW = video.offsetWidth;
+    const vH = video.offsetHeight;
+    // The raw video stream dimensions:
+    const rW = video.videoWidth;
+    const rH = video.videoHeight;
+
+    // Scale that object-fit: cover applies (fill screen, preserve aspect ratio)
+    const scale = Math.max(vW / rW, vH / rH);
+    // Rendered size of the video in pixels
+    const rendW = rW * scale;
+    const rendH = rH * scale;
+    // Offset of the video within the element (centered)
+    const offX = (rendW - vW) / 2;
+    const offY = (rendH - vH) / 2;
+
+    // Capture exactly what is visible (same crop as on screen)
+    // Output canvas = screen resolution for exact 1:1 match
+    canvas.width  = vW;
+    canvas.height = vH;
     const ctx = canvas.getContext('2d');
 
-    // Flip if front camera (not used here, but defensive)
-    ctx.drawImage(video, 0, 0);
+    // drawImage with source crop matching object-fit:cover
+    const srcX = offX / scale;
+    const srcY = offY / scale;
+    const srcW = vW  / scale;
+    const srcH = vH  / scale;
+    ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, vW, vH);
 
-    const filename = getFilename();
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    Capture.lastDataUrl = dataUrl;
+    const filename  = getFilename();
+    const dataUrl   = canvas.toDataURL('image/jpeg', 0.95);
+    Capture.lastDataUrl  = dataUrl;
     Capture.lastFilename = filename;
 
-    // Flash effect
+    // Flash
     const flash = $('flash');
     flash.style.opacity = 1;
     setTimeout(() => flash.style.opacity = 0, 80);
 
-    // Update gallery thumbnail
+    // Update gallery thumb
     const thumbImg = $('galleryThumbImg');
     thumbImg.src = dataUrl;
     thumbImg.style.display = 'block';
     $('galleryIcon').style.display = 'none';
 
-    // Save to device
-    await Capture.saveToDevice(dataUrl, filename);
+    // Show preview modal immediately
+    Capture.openPreview(dataUrl, filename);
   },
 
-  async saveToDevice(dataUrl, filename) {
+  openPreview(dataUrl, filename) {
+    $('previewModalImg').src = dataUrl;
+    $('previewModal').classList.add('open');
+  },
+
+  closePreview() {
+    $('previewModal').classList.remove('open');
+    $('previewModalImg').src = '';
+  },
+
+  async saveCurrentPhoto() {
+    const dataUrl  = Capture.lastDataUrl;
+    const filename = Capture.lastFilename;
+    if (!dataUrl) return;
+
     const blob = dataUrlToBlob(dataUrl);
     const file = new File([blob], filename, { type: 'image/jpeg' });
 
-    // Web Share API – opens iOS share sheet → user can "In Fotos sichern"
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    // Try Web Share API (iOS → "In Fotos" option in share sheet)
+    const canUseShare = navigator.share && navigator.canShare && (() => {
+      try { return navigator.canShare({ files: [file] }); } catch(e) { return false; }
+    })();
+
+    if (canUseShare) {
       try {
-        await navigator.share({
-          files: [file],
-          title: 'Timelapse Aufnahme'
-        });
-        showToast('✓ Gespeichert');
+        await navigator.share({ files: [file], title: 'Timelapse' });
+        // Share sheet opened successfully – user taps "In Fotos"
+        Capture.closePreview();
       } catch (err) {
-        if (err.name !== 'AbortError') {
-          // User cancelled or share failed, fallback to download
+        if (err.name === 'AbortError') {
+          // User closed share sheet without saving – keep modal open
+        } else {
+          // Unexpected error – fallback
           Capture._fallbackDownload(dataUrl, filename);
+          Capture.closePreview();
         }
       }
     } else {
-      // Fallback for non-supporting browsers
+      // No share API – download to Files
       Capture._fallbackDownload(dataUrl, filename);
+      Capture.closePreview();
     }
   },
 
@@ -699,35 +787,7 @@ const Capture = {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    showToast('✓ Foto heruntergeladen');
-  },
-
-  // Re-share last photo (tapping gallery thumb)
-  async shareLastPhoto() {
-    if (!Capture.lastDataUrl) {
-      showToast('Noch kein Foto aufgenommen');
-      return;
-    }
-    await Capture.saveToDevice(Capture.lastDataUrl, Capture.lastFilename);
-  }
-};
-
-/* ─────────────────────────────────────────
-   ORIENTATION MODULE
-   
-   Fix: screen.orientation.lock only in fullscreen (not available
-   in Safari). Instead we just show a toast about rotating the phone.
-───────────────────────────────────────── */
-const OrientationCtrl = {
-  toggle() {
-    const icon = $('rotateIcon');
-    icon.classList.remove('spin');
-    // Trigger reflow
-    void icon.offsetWidth;
-    icon.classList.add('spin');
-    setTimeout(() => icon.classList.remove('spin'), 400);
-
-    showToast('Drehe dein iPhone um 90°', 2000);
+    showToast('✓ Foto wird heruntergeladen');
   }
 };
 
@@ -770,19 +830,26 @@ $('shutterBtn').addEventListener('click', () => Capture.shoot());
 $('uploadBtn').addEventListener('click', () => $('overlayInput').click());
 $('overlayInput').addEventListener('change', e => {
   Overlay.load(e.target.files[0]);
-  e.target.value = ''; // reset so same file can be re-selected
+  e.target.value = '';
 });
 
-// Gallery thumb → share/save last photo
-$('galleryBtn').addEventListener('click', () => Capture.shareLastPhoto());
+// Gallery thumb → re-open last photo preview
+$('galleryBtn').addEventListener('click', () => {
+  if (!Capture.lastDataUrl) {
+    showToast('Noch kein Foto aufgenommen');
+    return;
+  }
+  Capture.openPreview(Capture.lastDataUrl, Capture.lastFilename);
+});
 
 // Opacity slider
 $('opacitySlider').addEventListener('input', e => {
   Overlay.setOpacity(parseInt(e.target.value));
 });
 
-// Rotate hint
-$('rotateBtn').addEventListener('click', () => OrientationCtrl.toggle());
+// Preview modal buttons
+$('previewShareBtn').addEventListener('click', () => Capture.saveCurrentPhoto());
+$('previewCloseBtn').addEventListener('click', () => Capture.closePreview());
 
 /* ─────────────────────────────────────────
    VIDEO STALL WATCHDOG
