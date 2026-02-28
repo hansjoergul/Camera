@@ -286,6 +286,8 @@ input[type="range"] {
   border-radius: 2px;
   outline: none;
   cursor: pointer;
+  /* Allow horizontal drag on iOS (overrides body touch-action:none) */
+  touch-action: pan-x;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -707,14 +709,13 @@ const UI = (() => {
     toastTimer = setTimeout(() => el.classList.remove('visible'), duration);
   }
 
-  // Prevent all touchmove on body to stop pull-to-refresh and rubber-banding.
-  // Exceptions: elements that explicitly need scrolling get touch-action:auto.
+  // Prevent pull-to-refresh and rubber-banding.
+  // Exceptions: range inputs (sliders) need touchmove to work.
   function lockScroll() {
     document.addEventListener('touchmove', e => {
-      // Only block if the target hasn't opted in to scrolling
-      if (!e.target.closest('[data-scroll]')) {
-        e.preventDefault();
-      }
+      // Allow touchmove on range inputs so the slider can be dragged
+      if (e.target.closest('input[type="range"]')) return;
+      e.preventDefault();
     }, { passive: false });
   }
 
