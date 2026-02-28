@@ -507,17 +507,15 @@ input[type=range]::-webkit-slider-thumb {
 <!-- ════ PHOTO PREVIEW MODAL ════ -->
 <div id="previewModal">
   <img id="previewModalImg" alt="Aufnahme">
-  <div id="previewLabel">In Fotos sichern → tippe "In Fotos" im Teilen-Menü</div>
+  <div id="previewLabel">Tippe "Teilen" → dann "In Fotos sichern"</div>
   <div id="previewModalBar">
-    <!-- Close without saving -->
     <button class="save-btn save-btn-close" id="previewCloseBtn">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
         <path d="M4 4l10 10M14 4L4 14" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
       </svg>
     </button>
-    <!-- Primary: share → "In Fotos sichern" -->
     <button class="save-btn save-btn-primary" id="previewShareBtn">
-      📤 &nbsp;In Fotos sichern
+      📤 &nbsp;Teilen / Sichern
     </button>
   </div>
 </div>
@@ -751,43 +749,52 @@ const Capture = {
     const filename = Capture.lastFilename;
     if (!dataUrl) return;
 
-    const blob = dataUrlToBlob(dataUrl);
-    const file = new File([blob], filename, { type: 'image/jpeg' });
-
-    // Try Web Share API (iOS → "In Fotos" option in share sheet)
-    const canUseShare = navigator.share && navigator.canShare && (() => {
-      try { return navigator.canShare({ files: [file] }); } catch(e) { return false; }
-    })();
-
-    if (canUseShare) {
+    // ── Strategy 1: Web Share API with file (iOS 15+ Safari, works on HTTPS) ──
+    if (typeof navigator.share === 'function') {
+      const blob = dataUrlToBlob(dataUrl);
+      const file = new File([blob], filename, { type: 'image/jpeg' });
       try {
         await navigator.share({ files: [file], title: 'Timelapse' });
-        // Share sheet opened successfully – user taps "In Fotos"
-        Capture.closePreview();
+        // Share sheet opened – user taps "In Fotos sichern" there
+        // Don't close modal yet; user may cancel and want to retry
+        return;
       } catch (err) {
         if (err.name === 'AbortError') {
-          // User closed share sheet without saving – keep modal open
-        } else {
-          // Unexpected error – fallback
-          Capture._fallbackDownload(dataUrl, filename);
-          Capture.closePreview();
+          // User cancelled share sheet – keep modal open so they can retry
+          return;
         }
+        // Any other error: fall through to strategy 2
+        console.warn('Share API failed:', err.name, err.message);
       }
-    } else {
-      // No share API – download to Files
-      Capture._fallbackDownload(dataUrl, filename);
-      Capture.closePreview();
     }
+
+    // ── Strategy 2: Open image in new tab → user long-presses → "Bild sichern" ──
+    // This is the only reliable fallback on iOS Safari where <a download> is blocked
+    Capture._openInNewTab(dataUrl);
   },
 
-  _fallbackDownload(dataUrl, filename) {
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    showToast('✓ Foto wird heruntergeladen');
+  _openInNewTab(dataUrl) {
+    // Open in same window as new page – iOS Safari allows long-press → save
+    const w = window.open();
+    if (w) {
+      w.document.write(`
+        <!DOCTYPE html><html><head>
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <style>
+          body{margin:0;background:#000;display:flex;flex-direction:column;
+               align-items:center;justify-content:center;min-height:100vh;}
+          img{max-width:100%;max-height:90vh;object-fit:contain;}
+          p{color:rgba(255,255,255,0.7);font-family:-apple-system,sans-serif;
+            font-size:15px;text-align:center;padding:16px;line-height:1.5;}
+        </style></head><body>
+        <img src="${dataUrl}" alt="Timelapse">
+        <p>Drücke lange auf das Bild → "Bild sichern"</p>
+        </body></html>`);
+      w.document.close();
+    } else {
+      // Pop-up blocked – last resort: data URL in current tab
+      window.location.href = dataUrl;
+    }
   }
 };
 
