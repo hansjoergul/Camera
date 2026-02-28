@@ -7,886 +7,1086 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Timelapse Overlay</title>
 <style>
-/* ── Reset & base ── */
+
+/* ══════════════════════════════════════════
+   RESET & VARIABLES
+══════════════════════════════════════════ */
+
 *, *::before, *::after {
-  margin: 0; padding: 0; box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
 }
 
 :root {
-  --safe-top: env(safe-area-inset-top, 44px);
+  --safe-top:    env(safe-area-inset-top,    44px);
   --safe-bottom: env(safe-area-inset-bottom, 34px);
-  --accent: #0A84FF;
-  --yellow: #FFD60A;
-  --danger: #FF453A;
-  --surface: rgba(28,28,30,0.92);
-  --text: #fff;
-  --text2: rgba(255,255,255,0.55);
-  --border: rgba(255,255,255,0.12);
+  --accent:  #0A84FF;
+  --yellow:  #FFD60A;
+  --danger:  #FF453A;
+  --surface: rgba(28, 28, 30, 0.94);
+  --text:    #ffffff;
+  --text2:   rgba(255, 255, 255, 0.55);
 }
 
-html, body {
-  width: 100%; height: 100%;
-  overflow: hidden;
-  background: #000;
-  color: var(--text);
-  font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
-  position: fixed; top: 0; left: 0;
-  /* Prevent address bar issues on mobile */
+html {
   height: -webkit-fill-available;
+  /* FIX: prevent pull-to-refresh in Safari */
+  overscroll-behavior: none;
 }
 
-/* ── Screen management ── */
-.screen {
-  position: fixed; inset: 0;
-  display: none;
-  background: #000;
-  /* Full height including notch */
+body {
+  width: 100%;
   height: 100vh;
   height: -webkit-fill-available;
+  overflow: hidden;
+  position: fixed;
+  top: 0; left: 0;
+  background: #000;
+  color: var(--text);
+  font-family: -apple-system, 'Helvetica Neue', sans-serif;
+  /* FIX: prevent bounce/pull-to-refresh on touch */
+  touch-action: none;
+  overscroll-behavior: none;
 }
-.screen.active { display: block; }
 
-/* ════════════════════════════════════════
-   START SCREEN
-════════════════════════════════════════ */
-#startScreen {
+/* ══════════════════════════════════════════
+   SCREEN SYSTEM
+══════════════════════════════════════════ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: -webkit-fill-available;
   display: none;
+  background: #000;
+}
+.screen.active { display: flex; }
+
+/* ══════════════════════════════════════════
+   START SCREEN
+══════════════════════════════════════════ */
+
+#screen-start {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
-  padding: 40px 30px;
-  padding-top: calc(var(--safe-top) + 20px);
+  padding: 40px 32px;
+  padding-top:    calc(var(--safe-top)    + 20px);
   padding-bottom: calc(var(--safe-bottom) + 20px);
+  gap: 0;
 }
-#startScreen.active { display: flex; }
 
 .app-icon {
-  width: 88px; height: 88px;
-  background: linear-gradient(150deg, #1c1c1e 0%, #2c2c2e 100%);
+  width: 88px;
+  height: 88px;
+  background: linear-gradient(145deg, #1c1c1e, #2c2c2e);
   border-radius: 20px;
-  display: flex; align-items: center; justify-content: center;
-  margin-bottom: 20px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07);
 }
 
 .app-title {
-  font-size: 26px; font-weight: 700;
+  font-size: 26px;
+  font-weight: 700;
   letter-spacing: -0.5px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
-.app-sub {
-  font-size: 14px; color: var(--text2);
-  text-align: center; line-height: 1.5;
-  margin-bottom: 44px;
-  max-width: 280px;
+
+.app-subtitle {
+  font-size: 15px;
+  color: var(--text2);
+  text-align: center;
+  line-height: 1.5;
+  max-width: 270px;
+  margin-bottom: 48px;
 }
 
 .btn {
-  width: 100%; max-width: 300px;
+  width: 100%;
+  max-width: 300px;
   padding: 16px;
-  border: none; border-radius: 13px;
-  font-size: 17px; font-weight: 600;
+  border: none;
+  border-radius: 13px;
+  font-size: 17px;
+  font-weight: 600;
   color: #fff;
   cursor: pointer;
-  transition: opacity 0.12s;
   letter-spacing: -0.2px;
+  transition: opacity 0.1s;
 }
-.btn:active { opacity: 0.7; transform: scale(0.98); }
-.btn-primary { background: var(--accent); }
+.btn:active { opacity: 0.65; }
+.btn-primary   { background: var(--accent); }
 .btn-secondary { background: rgba(255,255,255,0.12); margin-top: 12px; }
 
-/* ════════════════════════════════════════
+/* ══════════════════════════════════════════
    PERMISSION SCREEN
-════════════════════════════════════════ */
-#permScreen {
-  display: none;
+══════════════════════════════════════════ */
+
+#screen-permission {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 40px 32px;
   text-align: center;
   gap: 12px;
 }
-#permScreen.active { display: flex; }
-.perm-emoji { font-size: 64px; margin-bottom: 8px; }
-#permScreen h2 { font-size: 22px; font-weight: 700; }
-#permScreen p { color: var(--text2); font-size: 15px; line-height: 1.5; max-width: 280px; }
 
-/* ════════════════════════════════════════
+#screen-permission .perm-icon { font-size: 60px; margin-bottom: 8px; }
+#screen-permission h2 { font-size: 22px; font-weight: 700; }
+#screen-permission p  { color: var(--text2); font-size: 15px; line-height: 1.5; max-width: 270px; }
+
+/* ══════════════════════════════════════════
    CAMERA SCREEN
-════════════════════════════════════════ */
-#camScreen {
-  /* block, not flex – children are absolutely positioned */
+   Note: flex-direction not set — children
+   are absolutely positioned layers.
+══════════════════════════════════════════ */
+
+#screen-camera {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  /* FIX: allow touch events inside but block overscroll */
+  touch-action: none;
 }
 
-/* ── Video: fills entire screen ── */
+/* Layer 1: Video */
 #video {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   background: #000;
-  /* Critical for iOS Safari */
-  -webkit-transform: translateZ(0);
+  /* GPU compositing layer prevents black frames */
   transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
-/* ── Overlay image: SAME cover behavior as video so scale matches exactly ── */
-#overlayImg {
+/* Layer 2: Overlay image
+   MUST use same object-fit as video for pixel-perfect alignment */
+#overlay-img {
   position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;          /* ← must match video's object-fit: cover */
-  object-position: center;    /* ← must match video's default center anchor */
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;        /* matches video — same crop, same scale */
+  object-position: center;  /* matches video default */
   opacity: 0.5;
   pointer-events: none;
   display: none;
-  -webkit-transform: translateZ(0);
   transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
-/* ── Shutter flash ── */
+/* Layer 3: Shutter flash */
 #flash {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   background: #fff;
   opacity: 0;
   pointer-events: none;
   z-index: 20;
-  transition: opacity 0.06s;
+  transition: opacity 0.07s;
 }
 
-/* ── Top bar ── */
-#topBar {
+/* Layer 4: Top bar */
+#top-bar {
   position: absolute;
   top: 0; left: 0; right: 0;
   z-index: 10;
-  padding: calc(var(--safe-top) + 10px) 16px 16px;
-  display: flex; align-items: center; justify-content: space-between;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--safe-top) + 10px) 16px 18px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent);
 }
 
 .icon-btn {
-  width: 40px; height: 40px;
-  border: none; background: none;
-  color: #fff; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.icon-btn:active { background: rgba(255,255,255,0.18); }
+.icon-btn:active { background: rgba(255,255,255,0.2); }
 
-#opacityLabel {
-  background: rgba(0,0,0,0.52);
-  backdrop-filter: blur(12px) saturate(1.5);
-  -webkit-backdrop-filter: blur(12px) saturate(1.5);
-  border-radius: 20px;
-  padding: 5px 14px;
-  font-size: 13px; font-weight: 600;
-  color: var(--yellow);
-  min-width: 52px; text-align: center;
-}
-
-/* ── No-overlay hint ── */
-#noOverlayHint {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 5;
+#opacity-badge {
   background: rgba(0,0,0,0.5);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-radius: 14px;
-  padding: 14px 20px;
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--yellow);
+  min-width: 52px;
   text-align: center;
-  pointer-events: none;
-}
-#noOverlayHint p { font-size: 14px; color: rgba(255,255,255,0.7); line-height: 1.4; }
-#noOverlayHint .hint-arrow {
-  font-size: 24px; margin-top: 6px;
+  /* Hidden when no overlay loaded */
 }
 
-/* ── Bottom controls ── */
-#bottomControls {
+/* Layer 5: No-overlay hint */
+#no-overlay-hint {
+  position: absolute;
+  bottom: 200px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  background: rgba(0,0,0,0.52);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 14px;
+  padding: 12px 18px;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#no-overlay-hint p {
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.5;
+}
+
+/* Layer 6: Bottom controls */
+#bottom-controls {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   z-index: 10;
-  background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%);
-  padding-bottom: calc(var(--safe-bottom) + 4px);
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
+  padding-bottom: calc(var(--safe-bottom) + 6px);
 }
 
-/* Slider row */
-#sliderRow {
-  display: flex; align-items: center;
-  padding: 0 24px 12px;
+/* Opacity slider row */
+#slider-row {
+  display: none; /* shown only when overlay is loaded */
+  align-items: center;
+  padding: 0 24px 14px;
   gap: 12px;
 }
-.slider-icon { flex-shrink: 0; opacity: 0.55; }
 
-input[type=range] {
+.slider-icon { flex-shrink: 0; opacity: 0.5; }
+
+input[type="range"] {
   -webkit-appearance: none;
-  flex: 1; height: 4px;
+  flex: 1;
+  height: 4px;
   background: rgba(255,255,255,0.28);
   border-radius: 2px;
   outline: none;
   cursor: pointer;
 }
-input[type=range]::-webkit-slider-thumb {
+input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 24px; height: 24px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
-/* Shutter row */
-#shutterRow {
+/* Shutter row — 3-column layout */
+#shutter-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 36px 10px;
 }
 
-/* Gallery button → opens native picker */
-#galleryBtn {
-  width: 58px; height: 58px;
+/* Left: thumbnail of last photo */
+#last-photo-btn {
+  width: 58px;
+  height: 58px;
   border-radius: 12px;
   border: 2px solid rgba(255,255,255,0.45);
   background: rgba(255,255,255,0.08);
   overflow: hidden;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: opacity 0.12s;
-}
-#galleryBtn:active { opacity: 0.6; }
-#galleryThumbImg {
-  width: 100%; height: 100%; object-fit: cover; display: none;
-}
-#galleryIcon { display: flex; }
-
-/* Shutter */
-#shutterBtn {
-  width: 78px; height: 78px;
-  border: none; background: transparent;
-  cursor: pointer; padding: 0;
-  transition: transform 0.08s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  transition: opacity 0.1s;
 }
-#shutterBtn:active { transform: scale(0.92); }
+#last-photo-btn:active { opacity: 0.6; }
+#last-photo-img { width: 100%; height: 100%; object-fit: cover; display: none; }
+#last-photo-icon { display: flex; opacity: 0.5; }
+
+/* Center: shutter button */
+#shutter-btn {
+  width: 78px;
+  height: 78px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform 0.08s;
+}
+#shutter-btn:active { transform: scale(0.91); }
+
 .shutter-ring {
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   border: 4px solid #fff;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .shutter-fill {
-  width: 63px; height: 63px;
+  width: 63px;
+  height: 63px;
   border-radius: 50%;
   background: #fff;
 }
 
-/* Upload overlay btn */
-#uploadBtn {
-  width: 58px; height: 58px;
+/* Right: load reference image */
+#load-ref-btn {
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   border: none;
-  background: rgba(255,255,255,0.14);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.13);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   color: #fff;
-  transition: background 0.12s;
+  flex-shrink: 0;
+  transition: background 0.1s;
 }
-#uploadBtn:active { background: rgba(255,255,255,0.28); }
+#load-ref-btn:active { background: rgba(255,255,255,0.28); }
 
 /* Hidden inputs */
-#overlayInput, #saveInput { display: none; }
+#ref-input { display: none; }
+#canvas    { display: none; }
 
-/* ── Toast ── */
-#toast {
-  position: fixed;
-  top: calc(var(--safe-top) + 60px);
-  left: 50%; transform: translateX(-50%) translateY(-10px);
-  background: rgba(30,30,32,0.9);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 20px;
-  padding: 8px 18px;
-  font-size: 14px; font-weight: 500;
-  color: #fff;
-  z-index: 100;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s, transform 0.2s;
-  white-space: nowrap;
-}
-#toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
+/* ══════════════════════════════════════════
+   SAVE FALLBACK SCREEN
+   Shown when Web Share API is unavailable
+   (file:// protocol, older iOS, non-HTTPS).
 
-/* ── Overlay active badge ── */
-#overlayActiveBadge {
-  position: absolute;
-  top: calc(var(--safe-top) + 62px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-radius: 20px;
-  padding: 4px 12px;
-  font-size: 12px; color: var(--yellow); font-weight: 600;
-  pointer-events: none;
-  display: none;
-}
+   Strategy: show the photo fullscreen.
+   iOS native long-press menu on an <img>
+   always includes "Bild sichern" regardless
+   of protocol — no extra permissions needed.
+══════════════════════════════════════════ */
 
-/* ── Photo preview modal (after capture) ── */
-#previewModal {
-  position: fixed; inset: 0;
-  background: #000;
-  z-index: 50;
-  display: none;
+#screen-save {
   flex-direction: column;
+  background: #000;
+  /* This screen must allow touch on the image */
+  touch-action: auto;
 }
-#previewModal.open { display: flex; }
 
-#previewModalImg {
+/* The photo — fills screen, long-press saves it */
+#save-preview-img {
   flex: 1;
   width: 100%;
   object-fit: contain;
   background: #000;
+  display: block;
+  /* CRITICAL: re-enable iOS long-press context menu */
+  -webkit-touch-callout: default;
+  touch-action: auto;
+  user-select: auto;
+  -webkit-user-select: auto;
 }
 
-#previewModalBar {
-  padding: 16px 24px calc(var(--safe-bottom) + 12px);
+/* Pulsing ring animation to draw attention */
+@keyframes pulse-ring {
+  0%   { transform: translate(-50%, -50%) scale(0.92); opacity: 0.9; }
+  50%  { transform: translate(-50%, -50%) scale(1.08); opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) scale(0.92); opacity: 0.9; }
+}
+
+/* Overlay hint on the image */
+#save-hint-overlay {
+  position: absolute;
+  /* Centered in the image area (above the bar) */
+  bottom: calc(100px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  gap: 12px;
-  background: rgba(0,0,0,0.95);
-  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none; /* let touches pass through to the image */
+  z-index: 10;
 }
 
-.save-btn {
-  flex: 1; padding: 16px;
-  border: none; border-radius: 13px;
-  font-size: 16px; font-weight: 600;
-  cursor: pointer; color: #fff;
-  transition: opacity 0.12s;
+.save-hint-ring {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.7);
+  position: relative;
 }
-.save-btn:active { opacity: 0.65; }
-.save-btn-primary { background: var(--accent); }
-.save-btn-close   { background: rgba(255,255,255,0.12); flex: 0 0 auto; width: 56px; border-radius: 13px; }
+.save-hint-ring::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.35);
+  animation: pulse-ring 1.6s ease-in-out infinite;
+}
+.save-hint-finger {
+  font-size: 36px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+}
 
-#previewLabel {
-  font-size: 12px; color: var(--text2);
+.save-hint-text {
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 8px 16px;
   text-align: center;
-  padding: 0 24px 8px;
-  line-height: 1.4;
+}
+.save-hint-text strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 2px;
+}
+.save-hint-text span {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
 }
 
-/* ── Canvas (off-screen) ── */
-#canvas { display: none; }
+/* Bottom bar */
+#save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px calc(var(--safe-bottom) + 14px);
+  background: var(--surface);
+  border-top: 0.5px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+#save-back-btn {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+#save-back-btn:active { opacity: 0.65; }
+
+#save-share-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.1s;
+  flex: 1;
+}
+#save-share-btn:active { opacity: 0.65; }
+
+/* ══════════════════════════════════════════
+   TOAST NOTIFICATIONS
+══════════════════════════════════════════ */
+
+#toast {
+  position: fixed;
+  top: calc(var(--safe-top) + 58px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: rgba(30,30,32,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+}
+#toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 </style>
 </head>
 <body>
 
-<!-- ════ START SCREEN ════ -->
-<div id="startScreen" class="screen active">
+<!-- ══════ START ══════ -->
+<div id="screen-start" class="screen active">
   <div class="app-icon">
     <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
-      <circle cx="25" cy="20" r="9" stroke="#FFD60A" stroke-width="2.2"/>
-      <circle cx="25" cy="20" r="4" fill="#FFD60A" opacity="0.4"/>
-      <path d="M7 43c0-9.94 8.06-18 18-18s18 8.06 18 18" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
-      <rect x="33" y="6" width="13" height="9" rx="1.5" stroke="white" stroke-width="1.8"/>
-      <circle cx="39.5" cy="10.5" r="2" fill="#0A84FF"/>
+      <circle cx="25" cy="20" r="9" stroke="#FFD60A" stroke-width="2"/>
+      <circle cx="25" cy="20" r="4"  fill="#FFD60A" opacity="0.4"/>
+      <path d="M8 43c0-9.94 8.06-18 17-18s17 8.06 17 18" stroke="white" stroke-width="2" stroke-linecap="round"/>
     </svg>
   </div>
   <div class="app-title">Timelapse Overlay</div>
-  <div class="app-sub">Überlagere deine Kamera mit einem Referenzfoto – so bleiben alle Aufnahmen perfekt ausgerichtet.</div>
-  <button class="btn btn-primary" id="startBtn">Kamera starten</button>
+  <div class="app-subtitle">Überlagere die Kamera mit einem Referenzfoto für konsistente Aufnahmen.</div>
+  <button class="btn btn-primary" id="btn-start">Kamera starten</button>
 </div>
 
-<!-- ════ PERMISSION SCREEN ════ -->
-<div id="permScreen" class="screen">
-  <div class="perm-emoji">📷</div>
+<!-- ══════ PERMISSION ERROR ══════ -->
+<div id="screen-permission" class="screen">
+  <div class="perm-icon">📷</div>
   <h2>Kamerazugriff benötigt</h2>
-  <p>Bitte erlaube den Kamerazugriff in deinen Einstellungen und versuche es erneut.</p>
-  <button class="btn btn-primary" id="retryBtn" style="margin-top:20px;max-width:240px">Erneut versuchen</button>
-  <button class="btn btn-secondary" id="permBackBtn" style="max-width:240px">Zurück</button>
+  <p>Bitte erlaube den Kamerazugriff in den iPhone-Einstellungen und versuche es erneut.</p>
+  <button class="btn btn-primary" id="btn-retry" style="margin-top:24px; max-width:240px">
+    Erneut versuchen
+  </button>
+  <button class="btn btn-secondary" id="btn-perm-back" style="max-width:240px">
+    Zurück
+  </button>
 </div>
 
-<!-- ════ CAMERA SCREEN ════ -->
-<div id="camScreen" class="screen">
-  <!-- Video layer -->
+<!-- ══════ CAMERA ══════ -->
+<div id="screen-camera" class="screen">
+
+  <!-- Video stream -->
   <video id="video" autoplay playsinline muted></video>
 
-  <!-- Overlay layer -->
-  <img id="overlayImg" alt="Referenz">
+  <!-- Reference image overlay -->
+  <img id="overlay-img" alt="">
 
-  <!-- Flash -->
+  <!-- Shutter flash -->
   <div id="flash"></div>
 
-  <!-- Overlay active badge -->
-  <div id="overlayActiveBadge">Referenzbild aktiv</div>
-
-  <!-- No overlay hint -->
-  <div id="noOverlayHint">
-    <p>Kein Referenzbild geladen.<br>Tippe ↘ um eines hinzuzufügen.</p>
-    <div class="hint-arrow">↘</div>
-  </div>
-
   <!-- Top bar -->
-  <div id="topBar">
-    <button class="icon-btn" id="backBtn">
-      <!-- X icon -->
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M4 4l10 10M14 4L4 14" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <div id="top-bar">
+    <button class="icon-btn" id="btn-close-camera" aria-label="Schließen">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M2 2l12 12M14 2L2 14" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
       </svg>
     </button>
-    <div id="opacityLabel">50%</div>
-    <div style="width:40px"></div><!-- spacer -->
+
+    <div id="opacity-badge" style="visibility:hidden">50%</div>
+
+    <!-- Spacer for symmetry -->
+    <div style="width:40px"></div>
+  </div>
+
+  <!-- Hint: shown when no overlay loaded -->
+  <div id="no-overlay-hint">
+    <p>Referenzbild laden →</p>
   </div>
 
   <!-- Bottom controls -->
-  <div id="bottomControls">
-    <!-- Opacity slider (only when overlay loaded) -->
-    <div id="sliderRow" style="display:none">
-      <!-- min icon -->
+  <div id="bottom-controls">
+
+    <!-- Opacity slider — only visible when overlay is active -->
+    <div id="slider-row">
       <svg class="slider-icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
         <circle cx="9" cy="9" r="4" stroke="white" stroke-width="1.5"/>
       </svg>
-      <input type="range" id="opacitySlider" min="0" max="100" value="50">
-      <!-- max icon -->
+      <input type="range" id="opacity-slider" min="0" max="100" value="50"
+             aria-label="Transparenz des Referenzbildes">
       <svg class="slider-icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
         <circle cx="9" cy="9" r="7" stroke="white" stroke-width="1.5"/>
         <circle cx="9" cy="9" r="3" fill="white"/>
       </svg>
     </div>
 
-    <!-- Shutter row -->
-    <div id="shutterRow">
-      <!-- Gallery: opens last photo in native viewer / file picker for reference -->
-      <button id="galleryBtn" title="Letzte Aufnahme ansehen">
-        <img id="galleryThumbImg" alt="">
-        <span id="galleryIcon">
-          <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-            <rect x="2" y="7" width="16" height="13" rx="2.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
-            <path d="M20 10.5l4-2.5v10l-4-2.5v-5z" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- Main buttons -->
+    <div id="shutter-row">
+
+      <!-- Last captured photo thumbnail -->
+      <button id="last-photo-btn" aria-label="Letztes Foto">
+        <img id="last-photo-img" alt="Letztes Foto">
+        <span id="last-photo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="6" width="15" height="12" rx="2" stroke="white" stroke-width="1.5"/>
+            <path d="M19 9.5l3-2v9l-3-2v-5z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
           </svg>
         </span>
       </button>
 
       <!-- Shutter -->
-      <button id="shutterBtn">
+      <button id="shutter-btn" aria-label="Foto aufnehmen">
         <div class="shutter-ring">
           <div class="shutter-fill"></div>
         </div>
       </button>
 
-      <!-- Upload reference overlay -->
-      <button id="uploadBtn" title="Referenzbild laden">
-        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-          <rect x="3" y="3" width="20" height="20" rx="3" stroke="white" stroke-width="1.5"/>
-          <path d="M13 17V10M10 13l3-3 3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M9 20h8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      <!-- Load reference image -->
+      <button id="load-ref-btn" aria-label="Referenzbild laden">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="3" width="18" height="18" rx="2.5" stroke="white" stroke-width="1.5"/>
+          <path d="M12 15V9M9 12l3-3 3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 18h8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
       </button>
+
     </div>
   </div>
 
-  <!-- Reference overlay file picker -->
-  <input type="file" id="overlayInput" accept="image/*">
-
-  <!-- Hidden canvas for capture -->
+  <!-- File inputs -->
+  <input type="file" id="ref-input" accept="image/*">
   <canvas id="canvas"></canvas>
+
 </div>
 
-<!-- ════ PHOTO PREVIEW MODAL ════ -->
-<div id="previewModal">
-  <img id="previewModalImg" alt="Aufnahme">
-  <div id="previewLabel">Tippe "Teilen" → dann "In Fotos sichern"</div>
-  <div id="previewModalBar">
-    <button class="save-btn save-btn-close" id="previewCloseBtn">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M4 4l10 10M14 4L4 14" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
-      </svg>
-    </button>
-    <button class="save-btn save-btn-primary" id="previewShareBtn">
-      📤 &nbsp;Teilen / Sichern
-    </button>
+<!-- ══════ SAVE FALLBACK ══════ -->
+<!--
+  Shown when navigator.share({files}) is unavailable (file:// protocol).
+  The <img> element gets iOS native long-press menu with "Bild sichern".
+  -webkit-touch-callout:default and touch-action:auto are required on the img.
+-->
+<div id="screen-save" class="screen">
+  <img id="save-preview-img" alt="Aufnahme">
+
+  <!-- Animated hint (pointer-events:none so touches reach the image below) -->
+  <div id="save-hint-overlay">
+    <div class="save-hint-ring">
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+        <span class="save-hint-finger">👆</span>
+      </div>
+    </div>
+    <div class="save-hint-text">
+      <strong>Gedrückt halten</strong>
+      <span>→ "Bild sichern" wählen</span>
+    </div>
+  </div>
+
+  <div id="save-bar">
+    <button id="save-back-btn">← Zurück</button>
+    <button id="save-share-btn">📤 Teilen</button>
   </div>
 </div>
 
-<!-- ════ TOAST ════ -->
-<div id="toast"></div>
+<!-- Toast -->
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 'use strict';
 
-/* ─────────────────────────────────────────
-   UTILITIES
-───────────────────────────────────────── */
-const $ = id => document.getElementById(id);
+/* ══════════════════════════════════════════
+   MODULE: UI HELPERS
+══════════════════════════════════════════ */
 
-function showToast(msg, duration = 2200) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(showToast._timer);
-  showToast._timer = setTimeout(() => t.classList.remove('show'), duration);
-}
+const UI = (() => {
+  const $ = id => document.getElementById(id);
+  let toastTimer = null;
 
-function dataUrlToBlob(dataUrl) {
-  const [header, data] = dataUrl.split(',');
-  const mime = header.match(/:(.*?);/)[1];
-  const binary = atob(data);
-  const arr = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
-  return new Blob([arr], { type: mime });
-}
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    $(id).classList.add('active');
+  }
 
-function getFilename() {
-  const now = new Date();
-  const p = n => String(n).padStart(2,'0');
-  return `timelapse_${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}.jpg`;
-}
+  function showToast(message, duration = 2200) {
+    const el = $('toast');
+    el.textContent = message;
+    el.classList.add('visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('visible'), duration);
+  }
 
-/* ─────────────────────────────────────────
-   SCREEN MANAGER
-───────────────────────────────────────── */
-const screens = ['startScreen','permScreen','camScreen'];
+  // Prevent all touchmove on body to stop pull-to-refresh and rubber-banding.
+  // Exceptions: elements that explicitly need scrolling get touch-action:auto.
+  function lockScroll() {
+    document.addEventListener('touchmove', e => {
+      // Only block if the target hasn't opted in to scrolling
+      if (!e.target.closest('[data-scroll]')) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+  }
 
-function showScreen(id) {
-  screens.forEach(s => $( s).classList.remove('active'));
-  $(id).classList.add('active');
-}
+  function dataUrlToBlob(dataUrl) {
+    const [header, data] = dataUrl.split(',');
+    const mime   = header.match(/:(.*?);/)[1];
+    const bytes  = atob(data);
+    const buffer = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) buffer[i] = bytes.charCodeAt(i);
+    return new Blob([buffer], { type: mime });
+  }
 
-/* ─────────────────────────────────────────
-   CAMERA MODULE
-   
-   Fix: simplified constraints, explicit play(),
-   GPU composite layer (translateZ), no dimension constraints
-───────────────────────────────────────── */
-const Camera = {
-  stream: null,
+  return { $, showScreen, showToast, lockScroll, dataUrlToBlob };
+})();
 
-  async start() {
-    const video = $('video');
+/* ══════════════════════════════════════════
+   MODULE: CAMERA
+   Responsibility: manage MediaStream lifecycle
+══════════════════════════════════════════ */
 
-    // Stop any existing stream
-    Camera.stop();
+const Camera = (() => {
+  const { $, showScreen, showToast } = UI;
+  let stream = null;
 
+  async function start() {
+    // Always stop previous stream first
+    stop();
+
+    // Minimal constraints: let iOS pick the best config.
+    // Width/height ideals often cause black frames on iOS.
     const constraints = {
-      video: {
-        facingMode: { ideal: 'environment' }
-        // No width/height ideal – let browser pick best
-      },
+      video: { facingMode: { ideal: 'environment' } },
       audio: false
     };
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      Camera.stream = stream;
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const video = $('video');
       video.srcObject = stream;
-
-      // Must explicitly call play() on iOS Safari after setting srcObject
+      // Explicit play() required by iOS Safari after srcObject assignment
       await video.play();
-
-      showScreen('camScreen');
+      showScreen('screen-camera');
     } catch (err) {
-      console.error('Camera error:', err.name, err.message);
-      showScreen('permScreen');
+      console.error('[Camera] start failed:', err.name, err.message);
+      showScreen('screen-permission');
     }
-  },
-
-  stop() {
-    if (Camera.stream) {
-      Camera.stream.getTracks().forEach(t => t.stop());
-      Camera.stream = null;
-    }
-    const v = $('video');
-    v.srcObject = null;
   }
-};
 
-/* ─────────────────────────────────────────
-   OVERLAY MODULE
-───────────────────────────────────────── */
-const Overlay = {
-  loaded: false,
+  function stop() {
+    if (!stream) return;
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    const video = $('video');
+    video.srcObject = null;
+  }
 
-  load(file) {
+  function isActive() {
+    return stream !== null;
+  }
+
+  // Restart on visibility restore (app comes back from background)
+  document.addEventListener('visibilitychange', () => {
+    const camActive = document.getElementById('screen-camera').classList.contains('active');
+    if (!document.hidden && camActive) {
+      const video = $('video');
+      if (!stream) {
+        start();
+      } else if (video.paused) {
+        video.play().catch(() => {});
+      }
+    }
+  });
+
+  // Guard against stalled video (rare on iOS)
+  document.getElementById('video').addEventListener('stalled', () => {
+    const video = $('video');
+    if (stream) {
+      video.srcObject = stream;
+      video.play().catch(() => {});
+    }
+  });
+
+  return { start, stop, isActive };
+})();
+
+/* ══════════════════════════════════════════
+   MODULE: OVERLAY
+   Responsibility: load and display reference image
+══════════════════════════════════════════ */
+
+const Overlay = (() => {
+  const { $, showToast } = UI;
+  const MAX_DIMENSION = 4096; // Resize above this to avoid iOS memory pressure
+  let loaded = false;
+
+  function load(file) {
     if (!file) return;
+
     const reader = new FileReader();
+    reader.onerror = () => showToast('Fehler beim Laden des Bildes');
     reader.onload = e => {
       const img = new Image();
+      img.onerror = () => showToast('Ungültiges Bildformat');
       img.onload = () => {
-        // Resize if > 4096px to avoid memory issues on mobile
-        const MAX = 4096;
-        if (img.width > MAX || img.height > MAX) {
-          const cv = document.createElement('canvas');
-          const r = Math.min(MAX / img.width, MAX / img.height);
-          cv.width = Math.round(img.width * r);
-          cv.height = Math.round(img.height * r);
-          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-          Overlay._apply(cv.toDataURL('image/jpeg', 0.9));
-        } else {
-          Overlay._apply(e.target.result);
-        }
+        const src = _maybeResize(img, e.target.result);
+        _apply(src);
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
-  },
+  }
 
-  _apply(src) {
-    const el = $('overlayImg');
+  function _maybeResize(img, originalSrc) {
+    if (img.width <= MAX_DIMENSION && img.height <= MAX_DIMENSION) {
+      return originalSrc;
+    }
+    const scale = Math.min(MAX_DIMENSION / img.width, MAX_DIMENSION / img.height);
+    const cv = document.createElement('canvas');
+    cv.width  = Math.round(img.width  * scale);
+    cv.height = Math.round(img.height * scale);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', 0.9);
+  }
+
+  function _apply(src) {
+    const el = $('overlay-img');
     el.src = src;
     el.style.display = 'block';
-    Overlay.loaded = true;
+    loaded = true;
 
-    // Show slider
-    $('sliderRow').style.display = 'flex';
-
-    // Show badge briefly
-    const badge = $('overlayActiveBadge');
-    badge.style.display = 'block';
-    setTimeout(() => badge.style.display = 'none', 2500);
-
-    // Hide hint
-    $('noOverlayHint').style.display = 'none';
+    // Show opacity slider and badge
+    $('slider-row').style.display = 'flex';
+    $('opacity-badge').style.visibility = 'visible';
+    $('no-overlay-hint').style.display = 'none';
 
     showToast('✓ Referenzbild geladen');
-  },
-
-  setOpacity(val) {
-    $('overlayImg').style.opacity = val / 100;
-    $('opacityLabel').textContent = `${val}%`;
   }
-};
 
-/* ─────────────────────────────────────────
-   CAPTURE MODULE
-───────────────────────────────────────── */
-const Capture = {
-  lastDataUrl: null,
-  lastFilename: null,
+  function setOpacity(value) {
+    $('overlay-img').style.opacity = value / 100;
+    $('opacity-badge').textContent  = `${value}%`;
+  }
 
-  shoot() {
+  function isLoaded() { return loaded; }
+
+  return { load, setOpacity, isLoaded };
+})();
+
+/* ══════════════════════════════════════════
+   MODULE: CAPTURE
+   Responsibility: take photo, save to Photos
+
+   iOS Save Strategy:
+   1. navigator.share({files}) called WITHIN the shutter
+      click handler (same user gesture = share sheet opens
+      immediately, no second tap required).
+   2. If share API is unavailable (non-HTTPS, older iOS):
+      show fallback screen where user long-presses to save.
+
+   Canvas crop logic:
+   The video element uses object-fit:cover, which scales the
+   stream to fill the element and crops the excess. To capture
+   exactly what is visible (not the full uncropped stream), we
+   calculate the same crop and apply it via drawImage src params.
+══════════════════════════════════════════ */
+
+const Capture = (() => {
+  const { $, showScreen, showToast, dataUrlToBlob } = UI;
+  let lastDataUrl  = null;
+  let lastFilename = null;
+
+  // Called directly from shutter button click (user gesture required for share)
+  async function shoot() {
     const video = $('video');
-    const canvas = $('canvas');
 
     if (!video.videoWidth || !video.videoHeight) {
-      showToast('Kamera noch nicht bereit');
+      showToast('Kamera noch nicht bereit – bitte kurz warten');
       return;
     }
 
-    // --- Determine visible crop (matching object-fit: cover rendering) ---
-    // The video element dimensions on screen:
-    const vW = video.offsetWidth;
-    const vH = video.offsetHeight;
-    // The raw video stream dimensions:
-    const rW = video.videoWidth;
-    const rH = video.videoHeight;
+    const dataUrl  = _captureFrame(video);
+    const filename = _generateFilename();
 
-    // Scale that object-fit: cover applies (fill screen, preserve aspect ratio)
-    const scale = Math.max(vW / rW, vH / rH);
-    // Rendered size of the video in pixels
-    const rendW = rW * scale;
-    const rendH = rH * scale;
-    // Offset of the video within the element (centered)
-    const offX = (rendW - vW) / 2;
-    const offY = (rendH - vH) / 2;
+    lastDataUrl  = dataUrl;
+    lastFilename = filename;
 
-    // Capture exactly what is visible (same crop as on screen)
-    // Output canvas = screen resolution for exact 1:1 match
-    canvas.width  = vW;
-    canvas.height = vH;
-    const ctx = canvas.getContext('2d');
+    _triggerFlash();
+    _updateThumbnail(dataUrl);
 
-    // drawImage with source crop matching object-fit:cover
-    const srcX = offX / scale;
-    const srcY = offY / scale;
-    const srcW = vW  / scale;
-    const srcH = vH  / scale;
-    ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, vW, vH);
+    // Attempt to save. Must be called here (same gesture stack as shutter tap).
+    await _save(dataUrl, filename);
+  }
 
-    const filename  = getFilename();
-    const dataUrl   = canvas.toDataURL('image/jpeg', 0.95);
-    Capture.lastDataUrl  = dataUrl;
-    Capture.lastFilename = filename;
+  // Re-share the last captured photo (thumbnail tap)
+  async function reshareLastPhoto() {
+    if (!lastDataUrl) {
+      showToast('Noch kein Foto aufgenommen');
+      return;
+    }
+    await _save(lastDataUrl, lastFilename);
+  }
 
-    // Flash
+  // ── Private ─────────────────────────────
+
+  function _captureFrame(video) {
+    const canvas = $('canvas');
+
+    // Screen dimensions (what is actually visible)
+    const screenW = video.offsetWidth;
+    const screenH = video.offsetHeight;
+
+    // Raw camera stream dimensions
+    const streamW = video.videoWidth;
+    const streamH = video.videoHeight;
+
+    // object-fit:cover scale factor: fills screen, crops excess
+    const coverScale = Math.max(screenW / streamW, screenH / streamH);
+
+    // Rendered stream size after cover scale
+    const renderedW = streamW * coverScale;
+    const renderedH = streamH * coverScale;
+
+    // Pixel offset of the crop (centred)
+    const cropOffsetX = (renderedW - screenW) / 2;
+    const cropOffsetY = (renderedH - screenH) / 2;
+
+    // Source rectangle in original stream coordinates
+    const srcX = cropOffsetX / coverScale;
+    const srcY = cropOffsetY / coverScale;
+    const srcW = screenW    / coverScale;
+    const srcH = screenH    / coverScale;
+
+    // Output canvas = screen pixel size (1:1 with what user sees)
+    canvas.width  = screenW;
+    canvas.height = screenH;
+
+    canvas.getContext('2d').drawImage(video, srcX, srcY, srcW, srcH, 0, 0, screenW, screenH);
+
+    return canvas.toDataURL('image/jpeg', 0.95);
+  }
+
+  function _generateFilename() {
+    const now  = new Date();
+    const pad  = n => String(n).padStart(2, '0');
+    return `timelapse_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.jpg`;
+  }
+
+  function _triggerFlash() {
     const flash = $('flash');
     flash.style.opacity = 1;
-    setTimeout(() => flash.style.opacity = 0, 80);
+    setTimeout(() => { flash.style.opacity = 0; }, 80);
+  }
 
-    // Update gallery thumb
-    const thumbImg = $('galleryThumbImg');
-    thumbImg.src = dataUrl;
-    thumbImg.style.display = 'block';
-    $('galleryIcon').style.display = 'none';
+  function _updateThumbnail(dataUrl) {
+    $('last-photo-img').src     = dataUrl;
+    $('last-photo-img').style.display  = 'block';
+    $('last-photo-icon').style.display = 'none';
+  }
 
-    // Show preview modal immediately
-    Capture.openPreview(dataUrl, filename);
-  },
+  async function _save(dataUrl, filename) {
+    // On file:// protocol, navigator.share({files}) is always blocked by iOS.
+    // Skip straight to the visual fallback to avoid a confusing error flash.
+    const isFileProtocol = location.protocol === 'file:';
 
-  openPreview(dataUrl, filename) {
-    $('previewModalImg').src = dataUrl;
-    $('previewModal').classList.add('open');
-  },
-
-  closePreview() {
-    $('previewModal').classList.remove('open');
-    $('previewModalImg').src = '';
-  },
-
-  async saveCurrentPhoto() {
-    const dataUrl  = Capture.lastDataUrl;
-    const filename = Capture.lastFilename;
-    if (!dataUrl) return;
-
-    // ── Strategy 1: Web Share API with file (iOS 15+ Safari, works on HTTPS) ──
-    if (typeof navigator.share === 'function') {
-      const blob = dataUrlToBlob(dataUrl);
-      const file = new File([blob], filename, { type: 'image/jpeg' });
+    if (!isFileProtocol && typeof navigator.share === 'function') {
       try {
-        await navigator.share({ files: [file], title: 'Timelapse' });
-        // Share sheet opened – user taps "In Fotos sichern" there
-        // Don't close modal yet; user may cancel and want to retry
+        const blob = dataUrlToBlob(dataUrl);
+        const file = new File([blob], filename, { type: 'image/jpeg' });
+        await navigator.share({ files: [file], title: 'Timelapse Foto' });
+        // Share sheet opened — "In Fotos sichern" is one tap inside it.
         return;
       } catch (err) {
         if (err.name === 'AbortError') {
-          // User cancelled share sheet – keep modal open so they can retry
+          // User cancelled the share sheet — stay on camera, do nothing.
           return;
         }
-        // Any other error: fall through to strategy 2
-        console.warn('Share API failed:', err.name, err.message);
+        // Other error (e.g. file sharing not supported on this browser):
+        // fall through to visual fallback below.
+        console.warn('[Capture] share failed:', err.name, err.message);
       }
     }
 
-    // ── Strategy 2: Open image in new tab → user long-presses → "Bild sichern" ──
-    // This is the only reliable fallback on iOS Safari where <a download> is blocked
-    Capture._openInNewTab(dataUrl);
-  },
-
-  _openInNewTab(dataUrl) {
-    // Open in same window as new page – iOS Safari allows long-press → save
-    const w = window.open();
-    if (w) {
-      w.document.write(`
-        <!DOCTYPE html><html><head>
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <style>
-          body{margin:0;background:#000;display:flex;flex-direction:column;
-               align-items:center;justify-content:center;min-height:100vh;}
-          img{max-width:100%;max-height:90vh;object-fit:contain;}
-          p{color:rgba(255,255,255,0.7);font-family:-apple-system,sans-serif;
-            font-size:15px;text-align:center;padding:16px;line-height:1.5;}
-        </style></head><body>
-        <img src="${dataUrl}" alt="Timelapse">
-        <p>Drücke lange auf das Bild → "Bild sichern"</p>
-        </body></html>`);
-      w.document.close();
-    } else {
-      // Pop-up blocked – last resort: data URL in current tab
-      window.location.href = dataUrl;
-    }
+    // Fallback: show photo fullscreen so user can long-press → "Bild sichern".
+    // This works on ALL iOS versions and protocols — it uses the native
+    // Safari image context menu, which always includes "Bild sichern".
+    $('save-preview-img').src = dataUrl;
+    showScreen('screen-save');
   }
-};
 
-/* ─────────────────────────────────────────
-   EVENT WIRING
-───────────────────────────────────────── */
+  return { shoot, reshareLastPhoto, getLastDataUrl: () => lastDataUrl, getLastFilename: () => lastFilename };
+})();
 
-// Start screen
-$('startBtn').addEventListener('click', () => Camera.start());
+/* ══════════════════════════════════════════
+   MODULE: APP
+   Responsibility: wire events, bootstrap
+══════════════════════════════════════════ */
 
-// Permission screen
-$('retryBtn').addEventListener('click', () => Camera.start());
-$('permBackBtn').addEventListener('click', () => {
-  Camera.stop();
-  showScreen('startScreen');
-});
+const App = (() => {
+  const { $, showScreen, showToast, lockScroll, dataUrlToBlob } = UI;
 
-// Back to start
-$('backBtn').addEventListener('click', () => {
-  Camera.stop();
-  $('overlayImg').src = '';
-  $('overlayImg').style.display = 'none';
-  $('noOverlayHint').style.display = 'block';
-  $('sliderRow').style.display = 'none';
-  $('opacitySlider').value = 50;
-  $('opacityLabel').textContent = '50%';
-  $('galleryThumbImg').style.display = 'none';
-  $('galleryThumbImg').src = '';
-  $('galleryIcon').style.display = 'flex';
-  Overlay.loaded = false;
-  Capture.lastDataUrl = null;
-  Capture.lastFilename = null;
-  showScreen('startScreen');
-});
-
-// Shutter
-$('shutterBtn').addEventListener('click', () => Capture.shoot());
-
-// Upload reference overlay
-$('uploadBtn').addEventListener('click', () => $('overlayInput').click());
-$('overlayInput').addEventListener('change', e => {
-  Overlay.load(e.target.files[0]);
-  e.target.value = '';
-});
-
-// Gallery thumb → re-open last photo preview
-$('galleryBtn').addEventListener('click', () => {
-  if (!Capture.lastDataUrl) {
-    showToast('Noch kein Foto aufgenommen');
-    return;
+  function init() {
+    lockScroll();
+    _bindEvents();
   }
-  Capture.openPreview(Capture.lastDataUrl, Capture.lastFilename);
-});
 
-// Opacity slider
-$('opacitySlider').addEventListener('input', e => {
-  Overlay.setOpacity(parseInt(e.target.value));
-});
+  function _bindEvents() {
+    // Start screen
+    $('btn-start').addEventListener('click', () => Camera.start());
 
-// Preview modal buttons
-$('previewShareBtn').addEventListener('click', () => Capture.saveCurrentPhoto());
-$('previewCloseBtn').addEventListener('click', () => Capture.closePreview());
+    // Permission screen
+    $('btn-retry').addEventListener('click',     () => Camera.start());
+    $('btn-perm-back').addEventListener('click', () => showScreen('screen-start'));
 
-/* ─────────────────────────────────────────
-   VIDEO STALL WATCHDOG
-   If video stops rendering (black screen), restart
-───────────────────────────────────────── */
-const video = $('video');
-video.addEventListener('loadedmetadata', () => {
-  video.play().catch(err => console.warn('Play error:', err));
-});
-video.addEventListener('stalled', () => {
-  console.warn('Video stalled – attempting restart');
-  if (Camera.stream) {
-    video.srcObject = Camera.stream;
-    video.play().catch(() => {});
+    // Camera: close
+    $('btn-close-camera').addEventListener('click', () => {
+      Camera.stop();
+      showScreen('screen-start');
+    });
+
+    // Camera: shutter — async handler, share call is within this gesture
+    $('shutter-btn').addEventListener('click', () => {
+      Capture.shoot();
+    });
+
+    // Camera: load reference image
+    $('load-ref-btn').addEventListener('click', () => $('ref-input').click());
+    $('ref-input').addEventListener('change', e => {
+      Overlay.load(e.target.files[0]);
+      e.target.value = ''; // reset so same file can be reselected
+    });
+
+    // Camera: opacity slider
+    $('opacity-slider').addEventListener('input', e => {
+      Overlay.setOpacity(parseInt(e.target.value, 10));
+    });
+
+    // Camera: thumbnail tap → reshare last photo
+    $('last-photo-btn').addEventListener('click', () => Capture.reshareLastPhoto());
+
+    // Save fallback screen
+    $('save-back-btn').addEventListener('click', () => {
+      $('save-preview-img').src = '';
+      showScreen('screen-camera');
+    });
+
+    // "Teilen" button on fallback screen — retry share (works if user was on file://
+    // and has since navigated, or to try the system share sheet directly)
+    $('save-share-btn').addEventListener('click', async () => {
+      const dataUrl  = Capture.getLastDataUrl();
+      const filename = Capture.getLastFilename();
+      if (!dataUrl) return;
+      if (typeof navigator.share === 'function') {
+        try {
+          const blob = dataUrlToBlob(dataUrl);
+          const file = new File([blob], filename, { type: 'image/jpeg' });
+          await navigator.share({ files: [file], title: 'Timelapse Foto' });
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            UI.showToast('Teilen nicht verfügbar – bitte lang drücken');
+          }
+        }
+      } else {
+        UI.showToast('Bitte Bild lang gedrückt halten → "Bild sichern"');
+      }
+    });
   }
-});
 
-/* ─────────────────────────────────────────
-   VISIBILITY CHANGE
-   Restore camera when app comes back to foreground
-───────────────────────────────────────── */
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && $('camScreen').classList.contains('active')) {
-    if (!Camera.stream) {
-      Camera.start();
-    } else if (video.paused) {
-      video.play().catch(() => {});
-    }
-  }
-});
+  return { init };
+})();
+
+// Bootstrap
+App.init();
 </script>
 </body>
 </html>
