@@ -7,926 +7,810 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Timelapse Overlay</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* ── Reset & base ── */
+*, *::before, *::after {
+  margin: 0; padding: 0; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
 
-  :root {
-    --ios-bg: #000;
-    --ios-surface: rgba(28,28,30,0.85);
-    --ios-surface2: rgba(44,44,46,0.9);
-    --ios-border: rgba(255,255,255,0.12);
-    --ios-text: #fff;
-    --ios-text2: rgba(255,255,255,0.6);
-    --ios-accent: #0A84FF;
-    --ios-yellow: #FFD60A;
-    --safe-bottom: env(safe-area-inset-bottom, 20px);
-    --safe-top: env(safe-area-inset-top, 0px);
-  }
+:root {
+  --safe-top: env(safe-area-inset-top, 44px);
+  --safe-bottom: env(safe-area-inset-bottom, 34px);
+  --accent: #0A84FF;
+  --yellow: #FFD60A;
+  --danger: #FF453A;
+  --surface: rgba(28,28,30,0.92);
+  --text: #fff;
+  --text2: rgba(255,255,255,0.55);
+  --border: rgba(255,255,255,0.12);
+}
 
-  html, body {
-    width: 100%; height: 100%;
-    overflow: hidden;
-    background: #000;
-    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
-    color: var(--ios-text);
-    position: fixed;
-    top: 0; left: 0;
-  }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: var(--text);
+  font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  position: fixed; top: 0; left: 0;
+  /* Prevent address bar issues on mobile */
+  height: -webkit-fill-available;
+}
 
-  /* ─── SCREENS ─── */
-  .screen { 
-    position: absolute; inset: 0;
-    display: none; flex-direction: column;
-    transition: opacity 0.3s ease;
-  }
-  .screen.active { display: flex; }
+/* ── Screen management ── */
+.screen {
+  position: fixed; inset: 0;
+  display: none;
+  background: #000;
+  /* Full height including notch */
+  height: 100vh;
+  height: -webkit-fill-available;
+}
+.screen.active { display: block; }
 
-  /* ─── START SCREEN ─── */
-  #startScreen {
-    align-items: center; justify-content: center;
-    background: #000;
-    gap: 0;
-  }
+/* ════════════════════════════════════════
+   START SCREEN
+════════════════════════════════════════ */
+#startScreen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 40px 30px;
+  padding-top: calc(var(--safe-top) + 20px);
+  padding-bottom: calc(var(--safe-bottom) + 20px);
+}
+#startScreen.active { display: flex; }
 
-  .start-icon {
-    width: 90px; height: 90px;
-    background: linear-gradient(145deg, #1c1c1e, #2c2c2e);
-    border-radius: 22px;
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
-  }
-  .start-icon svg { width: 52px; height: 52px; }
+.app-icon {
+  width: 88px; height: 88px;
+  background: linear-gradient(150deg, #1c1c1e 0%, #2c2c2e 100%);
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+}
 
-  .start-title {
-    font-size: 28px; font-weight: 700;
-    letter-spacing: -0.5px;
-    margin-bottom: 8px;
-  }
-  .start-subtitle {
-    font-size: 15px; color: var(--ios-text2);
-    margin-bottom: 48px;
-    text-align: center; padding: 0 40px;
-    line-height: 1.4;
-  }
+.app-title {
+  font-size: 26px; font-weight: 700;
+  letter-spacing: -0.5px;
+  margin-bottom: 8px;
+}
+.app-sub {
+  font-size: 14px; color: var(--text2);
+  text-align: center; line-height: 1.5;
+  margin-bottom: 44px;
+  max-width: 280px;
+}
 
-  .ios-btn {
-    background: var(--ios-accent);
-    color: #fff;
-    border: none;
-    border-radius: 14px;
-    font-size: 17px; font-weight: 600;
-    padding: 16px 0;
-    width: 280px;
-    cursor: pointer;
-    transition: opacity 0.15s;
-    letter-spacing: -0.2px;
-  }
-  .ios-btn:active { opacity: 0.7; }
-  .ios-btn.secondary {
-    background: var(--ios-surface2);
-    margin-top: 12px;
-  }
+.btn {
+  width: 100%; max-width: 300px;
+  padding: 16px;
+  border: none; border-radius: 13px;
+  font-size: 17px; font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.12s;
+  letter-spacing: -0.2px;
+}
+.btn:active { opacity: 0.7; transform: scale(0.98); }
+.btn-primary { background: var(--accent); }
+.btn-secondary { background: rgba(255,255,255,0.12); margin-top: 12px; }
 
-  /* ─── CAMERA SCREEN ─── */
-  #cameraScreen {
-    background: #000;
-    position: relative;
-    overflow: hidden;
-  }
+/* ════════════════════════════════════════
+   PERMISSION SCREEN
+════════════════════════════════════════ */
+#permScreen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+  gap: 12px;
+}
+#permScreen.active { display: flex; }
+.perm-emoji { font-size: 64px; margin-bottom: 8px; }
+#permScreen h2 { font-size: 22px; font-weight: 700; }
+#permScreen p { color: var(--text2); font-size: 15px; line-height: 1.5; max-width: 280px; }
 
-  #videoContainer {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: #000;
-  }
+/* ════════════════════════════════════════
+   CAMERA SCREEN
+════════════════════════════════════════ */
+#camScreen {
+  /* block, not flex – children are absolutely positioned */
+}
 
-  #videoEl {
-    width: 100%; height: 100%;
-    object-fit: cover;
-  }
+/* ── Video: fills entire screen ── */
+#video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  background: #000;
+  /* Critical for iOS Safari */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
 
-  #overlayImg {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    max-width: 100%; max-height: 100%;
-    width: 100%; height: 100%;
-    object-fit: contain;
-    opacity: 0.5;
-    pointer-events: none;
-    display: none;
-    transition: opacity 0.1s;
-  }
+/* ── Overlay image: centered, contained ── */
+#overlayImg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  opacity: 0.5;
+  pointer-events: none;
+  display: none;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
 
-  /* Flash effect */
-  #flashEl {
-    position: absolute; inset: 0;
-    background: #fff;
-    opacity: 0;
-    pointer-events: none;
-    z-index: 10;
-    transition: opacity 0.05s;
-  }
+/* ── Shutter flash ── */
+#flash {
+  position: absolute; inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20;
+  transition: opacity 0.06s;
+}
 
-  /* Top bar */
-  #topBar {
-    position: absolute; top: 0; left: 0; right: 0;
-    padding: calc(var(--safe-top) + 12px) 20px 12px;
-    display: flex; align-items: center; justify-content: space-between;
-    z-index: 5;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
-  }
+/* ── Top bar ── */
+#topBar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  padding: calc(var(--safe-top) + 10px) 16px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%);
+}
 
-  .top-btn {
-    width: 36px; height: 36px;
-    border: none; background: none;
-    color: #fff;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 50%;
-    transition: background 0.15s;
-  }
-  .top-btn:active { background: rgba(255,255,255,0.2); }
+.icon-btn {
+  width: 40px; height: 40px;
+  border: none; background: none;
+  color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.icon-btn:active { background: rgba(255,255,255,0.18); }
 
-  #opacityBadge {
-    background: rgba(0,0,0,0.5);
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-size: 13px; font-weight: 600;
-    color: var(--ios-yellow);
-    backdrop-filter: blur(10px);
-  }
+#opacityLabel {
+  background: rgba(0,0,0,0.52);
+  backdrop-filter: blur(12px) saturate(1.5);
+  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 13px; font-weight: 600;
+  color: var(--yellow);
+  min-width: 52px; text-align: center;
+}
 
-  /* Bottom controls */
-  #bottomControls {
-    position: absolute; bottom: 0; left: 0; right: 0;
-    padding-bottom: calc(var(--safe-bottom) + 8px);
-    z-index: 5;
-    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
-  }
+/* ── No-overlay hint ── */
+#noOverlayHint {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 14px 20px;
+  text-align: center;
+  pointer-events: none;
+}
+#noOverlayHint p { font-size: 14px; color: rgba(255,255,255,0.7); line-height: 1.4; }
+#noOverlayHint .hint-arrow {
+  font-size: 24px; margin-top: 6px;
+}
 
-  /* Slider area */
-  #sliderArea {
-    padding: 8px 24px 16px;
-  }
+/* ── Bottom controls ── */
+#bottomControls {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 10;
+  background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%);
+  padding-bottom: calc(var(--safe-bottom) + 4px);
+}
 
-  .slider-row {
-    display: flex; align-items: center; gap: 12px;
-    margin-bottom: 4px;
-  }
-  .slider-label {
-    font-size: 12px; font-weight: 500;
-    color: var(--ios-text2);
-    width: 18px; text-align: center;
-  }
+/* Slider row */
+#sliderRow {
+  display: flex; align-items: center;
+  padding: 0 24px 12px;
+  gap: 12px;
+}
+.slider-icon { flex-shrink: 0; opacity: 0.55; }
 
-  input[type=range] {
-    -webkit-appearance: none;
-    flex: 1; height: 4px;
-    background: rgba(255,255,255,0.25);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 22px; height: 22px;
-    background: #fff;
-    border-radius: 50%;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    cursor: pointer;
-  }
+input[type=range] {
+  -webkit-appearance: none;
+  flex: 1; height: 4px;
+  background: rgba(255,255,255,0.28);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
 
-  /* Main buttons row */
-  #mainBtns {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 32px 8px;
-  }
+/* Shutter row */
+#shutterRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 36px 10px;
+}
 
-  /* Gallery thumbnail */
-  #galleryThumb {
-    width: 54px; height: 54px;
-    border-radius: 10px;
-    border: 2px solid rgba(255,255,255,0.5);
-    background: rgba(255,255,255,0.1);
-    overflow: hidden;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: opacity 0.15s;
-    flex-shrink: 0;
-  }
-  #galleryThumb:active { opacity: 0.7; }
-  #galleryThumb img {
-    width: 100%; height: 100%; object-fit: cover;
-  }
-  #galleryThumb svg { opacity: 0.5; }
+/* Gallery button → opens native picker */
+#galleryBtn {
+  width: 58px; height: 58px;
+  border-radius: 12px;
+  border: 2px solid rgba(255,255,255,0.45);
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.12s;
+}
+#galleryBtn:active { opacity: 0.6; }
+#galleryThumbImg {
+  width: 100%; height: 100%; object-fit: cover; display: none;
+}
+#galleryIcon { display: flex; }
 
-  /* Capture button */
-  #captureBtn {
-    width: 76px; height: 76px;
-    border: none;
-    border-radius: 50%;
-    background: transparent;
-    cursor: pointer;
-    padding: 3px;
-    position: relative;
-    transition: transform 0.1s;
-    flex-shrink: 0;
-  }
-  #captureBtn:active { transform: scale(0.93); }
-  .capture-outer {
-    width: 100%; height: 100%;
-    border-radius: 50%;
-    border: 3px solid #fff;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .capture-inner {
-    width: 62px; height: 62px;
-    border-radius: 50%;
-    background: #fff;
-  }
+/* Shutter */
+#shutterBtn {
+  width: 78px; height: 78px;
+  border: none; background: transparent;
+  cursor: pointer; padding: 0;
+  transition: transform 0.08s;
+  flex-shrink: 0;
+}
+#shutterBtn:active { transform: scale(0.92); }
+.shutter-ring {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.shutter-fill {
+  width: 63px; height: 63px;
+  border-radius: 50%;
+  background: #fff;
+}
 
-  /* Upload button */
-  #uploadBtn {
-    width: 54px; height: 54px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(255,255,255,0.15);
-    backdrop-filter: blur(10px);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    color: #fff;
-    transition: background 0.15s;
-    flex-shrink: 0;
-  }
-  #uploadBtn:active { background: rgba(255,255,255,0.3); }
+/* Upload overlay btn */
+#uploadBtn {
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  transition: background 0.12s;
+}
+#uploadBtn:active { background: rgba(255,255,255,0.28); }
 
-  #fileInput { display: none; }
+/* Hidden inputs */
+#overlayInput, #saveInput { display: none; }
 
-  /* ─── GALLERY SCREEN ─── */
-  #galleryScreen {
-    background: #000;
-    flex-direction: column;
-  }
+/* ── Toast ── */
+#toast {
+  position: fixed;
+  top: calc(var(--safe-top) + 60px);
+  left: 50%; transform: translateX(-50%) translateY(-10px);
+  background: rgba(30,30,32,0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 14px; font-weight: 500;
+  color: #fff;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  white-space: nowrap;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
 
-  #galleryHeader {
-    padding: calc(var(--safe-top) + 16px) 20px 12px;
-    display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 0.5px solid var(--ios-border);
-    flex-shrink: 0;
-    background: rgba(0,0,0,0.95);
-    backdrop-filter: blur(20px);
-  }
+/* ── Rotate animation ── */
+@keyframes spin180 {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(180deg); }
+}
+.spin { animation: spin180 0.35s ease forwards; }
 
-  #galleryHeader h2 {
-    font-size: 17px; font-weight: 600;
-    letter-spacing: -0.3px;
-  }
+/* ── Overlay active badge ── */
+#overlayActiveBadge {
+  position: absolute;
+  top: calc(var(--safe-top) + 62px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px; color: var(--yellow); font-weight: 600;
+  pointer-events: none;
+  display: none;
+}
 
-  .nav-btn {
-    background: none; border: none;
-    color: var(--ios-accent);
-    font-size: 17px; font-weight: 400;
-    cursor: pointer;
-    padding: 4px 0;
-    min-width: 50px;
-  }
-  .nav-btn:active { opacity: 0.5; }
-  .nav-btn.right { text-align: right; }
-
-  #photoCount {
-    font-size: 13px; color: var(--ios-text2);
-  }
-
-  #galleryGrid {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 2px;
-    align-content: start;
-    padding-bottom: calc(var(--safe-bottom) + 8px);
-  }
-
-  .photo-cell {
-    aspect-ratio: 1;
-    position: relative;
-    overflow: hidden;
-    cursor: pointer;
-    background: #1c1c1e;
-  }
-  .photo-cell img {
-    width: 100%; height: 100%; object-fit: cover;
-    display: block;
-    transition: opacity 0.15s;
-  }
-  .photo-cell:active img { opacity: 0.7; }
-
-  .empty-gallery {
-    grid-column: 1/-1;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    padding: 80px 40px;
-    gap: 12px;
-    color: var(--ios-text2);
-    text-align: center;
-  }
-  .empty-gallery svg { opacity: 0.3; }
-  .empty-gallery p { font-size: 15px; line-height: 1.5; }
-
-  /* ─── PHOTO VIEWER ─── */
-  #viewerScreen {
-    background: #000;
-    flex-direction: column;
-  }
-
-  #viewerHeader {
-    padding: calc(var(--safe-top) + 16px) 20px 12px;
-    display: flex; align-items: center; justify-content: space-between;
-    flex-shrink: 0;
-    background: rgba(0,0,0,0.8);
-    backdrop-filter: blur(20px);
-  }
-
-  #viewerBody {
-    flex: 1;
-    display: flex; align-items: center; justify-content: center;
-    overflow: hidden;
-    background: #000;
-  }
-  #viewerBody img {
-    max-width: 100%; max-height: 100%;
-    object-fit: contain;
-  }
-
-  #viewerFooter {
-    padding: 16px 20px calc(var(--safe-bottom) + 16px);
-    display: flex; align-items: center; justify-content: space-between;
-    background: rgba(0,0,0,0.8);
-    backdrop-filter: blur(20px);
-    flex-shrink: 0;
-  }
-
-  .viewer-action {
-    display: flex; flex-direction: column; align-items: center;
-    gap: 4px;
-    background: none; border: none;
-    color: #fff; cursor: pointer;
-    padding: 8px 16px;
-    border-radius: 10px;
-    transition: background 0.15s;
-  }
-  .viewer-action:active { background: rgba(255,255,255,0.15); }
-  .viewer-action span { font-size: 11px; color: var(--ios-text2); }
-  .viewer-action.danger { color: #FF453A; }
-  .viewer-action.danger span { color: #FF453A; }
-
-  #viewerDate {
-    font-size: 13px; color: var(--ios-text2);
-    text-align: center;
-  }
-
-  /* ─── CANVAS (hidden) ─── */
-  #captureCanvas { display: none; }
-
-  /* ─── PERMISSION SCREEN ─── */
-  #permissionScreen {
-    align-items: center; justify-content: center;
-    background: #000;
-    gap: 16px; padding: 40px;
-    text-align: center;
-  }
-  #permissionScreen .perm-icon {
-    font-size: 60px; margin-bottom: 8px;
-  }
-  #permissionScreen h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-  #permissionScreen p { color: var(--ios-text2); font-size: 15px; line-height: 1.5; }
-
-  /* Rotate icon animation */
-  .rotating { animation: spin 0.4s ease; }
-  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(180deg); } }
-
-  /* Overlay visible indicator */
-  #overlayIndicator {
-    position: absolute;
-    top: calc(var(--safe-top) + 58px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    padding: 4px 14px;
-    font-size: 12px; color: var(--ios-yellow);
-    font-weight: 500;
-    display: none;
-    z-index: 5;
-  }
-
-  /* Count badge on gallery */
-  #galleryCountBadge {
-    position: absolute;
-    top: -4px; right: -4px;
-    background: var(--ios-accent);
-    color: #fff;
-    font-size: 10px; font-weight: 700;
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    display: none;
-  }
-
-  /* Select mode */
-  .photo-cell.selected::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: rgba(10,132,255,0.3);
-    border: 2px solid var(--ios-accent);
-  }
-  .photo-cell .check {
-    position: absolute; bottom: 4px; right: 4px;
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    background: var(--ios-accent);
-    border: 2px solid #fff;
-    display: none; align-items: center; justify-content: center;
-  }
-  .photo-cell.selected .check { display: flex; }
-
-  /* swipe hint */
-  .slider-hint {
-    text-align: center;
-    font-size: 11px; color: rgba(255,255,255,0.3);
-    margin-top: 2px; margin-bottom: 2px;
-  }
+/* ── Canvas (off-screen) ── */
+#canvas { display: none; }
 </style>
 </head>
 <body>
 
-<!-- ─── START SCREEN ─── -->
+<!-- ════ START SCREEN ════ -->
 <div id="startScreen" class="screen active">
-  <div class="start-icon">
-    <svg viewBox="0 0 52 52" fill="none">
-      <circle cx="26" cy="22" r="10" stroke="#FFD60A" stroke-width="2.5"/>
-      <path d="M8 42c0-9.94 8.06-18 18-18s18 8.06 18 18" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-      <rect x="32" y="8" width="14" height="10" rx="2" fill="none" stroke="white" stroke-width="2"/>
-      <circle cx="39" cy="13" r="2.5" fill="#0A84FF"/>
-      <path d="M32 11h-4" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <div class="app-icon">
+    <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
+      <circle cx="25" cy="20" r="9" stroke="#FFD60A" stroke-width="2.2"/>
+      <circle cx="25" cy="20" r="4" fill="#FFD60A" opacity="0.4"/>
+      <path d="M7 43c0-9.94 8.06-18 18-18s18 8.06 18 18" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+      <rect x="33" y="6" width="13" height="9" rx="1.5" stroke="white" stroke-width="1.8"/>
+      <circle cx="39.5" cy="10.5" r="2" fill="#0A84FF"/>
     </svg>
   </div>
-  <div class="start-title">Timelapse Overlay</div>
-  <div class="start-subtitle">Halte dein Timelapse-Projekt konsistent – überlagere dein Live-Kamerabild mit einem Referenzfoto.</div>
-  <button class="ios-btn" id="startCameraBtn">Kamera starten</button>
-  <button class="ios-btn secondary" id="goToGalleryBtn">Galerie öffnen</button>
+  <div class="app-title">Timelapse Overlay</div>
+  <div class="app-sub">Überlagere deine Kamera mit einem Referenzfoto – so bleiben alle Aufnahmen perfekt ausgerichtet.</div>
+  <button class="btn btn-primary" id="startBtn">Kamera starten</button>
 </div>
 
-<!-- ─── PERMISSION SCREEN ─── -->
-<div id="permissionScreen" class="screen">
-  <div class="perm-icon">📷</div>
-  <h2>Kamerazugriff nötig</h2>
-  <p>Diese App benötigt Zugriff auf deine Kamera, um das Live-Bild anzuzeigen.</p>
-  <button class="ios-btn" id="retryBtn" style="margin-top:12px">Erneut versuchen</button>
-  <button class="ios-btn secondary" id="backFromPermBtn">Zurück</button>
+<!-- ════ PERMISSION SCREEN ════ -->
+<div id="permScreen" class="screen">
+  <div class="perm-emoji">📷</div>
+  <h2>Kamerazugriff benötigt</h2>
+  <p>Bitte erlaube den Kamerazugriff in deinen Einstellungen und versuche es erneut.</p>
+  <button class="btn btn-primary" id="retryBtn" style="margin-top:20px;max-width:240px">Erneut versuchen</button>
+  <button class="btn btn-secondary" id="permBackBtn" style="max-width:240px">Zurück</button>
 </div>
 
-<!-- ─── CAMERA SCREEN ─── -->
-<div id="cameraScreen" class="screen">
-  <div id="videoContainer">
-    <video id="videoEl" autoplay playsinline muted></video>
-    <img id="overlayImg" alt="overlay">
-    <div id="flashEl"></div>
+<!-- ════ CAMERA SCREEN ════ -->
+<div id="camScreen" class="screen">
+  <!-- Video layer -->
+  <video id="video" autoplay playsinline muted></video>
+
+  <!-- Overlay layer -->
+  <img id="overlayImg" alt="Referenz">
+
+  <!-- Flash -->
+  <div id="flash"></div>
+
+  <!-- Overlay active badge -->
+  <div id="overlayActiveBadge">Referenzbild aktiv</div>
+
+  <!-- No overlay hint -->
+  <div id="noOverlayHint">
+    <p>Kein Referenzbild geladen.<br>Tippe ↘ um eines hinzuzufügen.</p>
+    <div class="hint-arrow">↘</div>
   </div>
 
+  <!-- Top bar -->
   <div id="topBar">
-    <button class="top-btn" id="backBtn" title="Zurück">
+    <button class="icon-btn" id="backBtn">
+      <!-- X icon -->
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M11 4L6 9L11 14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 4l10 10M14 4L4 14" stroke="white" stroke-width="2" stroke-linecap="round"/>
       </svg>
     </button>
-    <div id="opacityBadge">50%</div>
-    <button class="top-btn" id="rotateBtn" title="Drehen">
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <path d="M3 11C3 6.58 6.58 3 11 3c2.5 0 4.73 1.12 6.25 2.89" stroke="white" stroke-width="2" stroke-linecap="round"/>
-        <path d="M19 11c0 4.42-3.58 8-8 8-2.5 0-4.73-1.12-6.25-2.89" stroke="white" stroke-width="2" stroke-linecap="round"/>
-        <path d="M17.25 2.5v3.39H13.86" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M4.75 19.5v-3.39H8.14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <div id="opacityLabel">50%</div>
+    <button class="icon-btn" id="rotateBtn" title="Ausrichtung">
+      <svg id="rotateIcon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M3 12C3 7.03 7.03 3 12 3c2.77 0 5.25 1.24 6.95 3.2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <path d="M21 12c0 4.97-4.03 9-9 9-2.77 0-5.25-1.24-6.95-3.2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <path d="M18.95 1.5v4.7h-4.7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M5.05 22.5v-4.7h4.7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </button>
   </div>
 
-  <div id="overlayIndicator">Referenzbild aktiv</div>
-
+  <!-- Bottom controls -->
   <div id="bottomControls">
-    <div id="sliderArea">
-      <div class="slider-row">
-        <span class="slider-label">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="5" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
-            <circle cx="8" cy="8" r="2" fill="rgba(255,255,255,0.6)"/>
-          </svg>
-        </span>
-        <input type="range" id="opacitySlider" min="0" max="100" value="50">
-        <span class="slider-label" style="width:30px; font-size:11px; color:rgba(255,255,255,0.5);" id="opacityVal">50%</span>
-      </div>
+    <!-- Opacity slider (only when overlay loaded) -->
+    <div id="sliderRow" style="display:none">
+      <!-- min icon -->
+      <svg class="slider-icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <circle cx="9" cy="9" r="4" stroke="white" stroke-width="1.5"/>
+      </svg>
+      <input type="range" id="opacitySlider" min="0" max="100" value="50">
+      <!-- max icon -->
+      <svg class="slider-icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <circle cx="9" cy="9" r="7" stroke="white" stroke-width="1.5"/>
+        <circle cx="9" cy="9" r="3" fill="white"/>
+      </svg>
     </div>
 
-    <div id="mainBtns">
-      <!-- Gallery thumb -->
-      <div style="position:relative">
-        <div id="galleryThumb" title="Galerie">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="7" width="12" height="10" rx="2" stroke="white" stroke-width="1.5"/>
-            <path d="M17 9l4-2v10l-4-2V9z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- Shutter row -->
+    <div id="shutterRow">
+      <!-- Gallery: opens last photo in native viewer / file picker for reference -->
+      <button id="galleryBtn" title="Letzte Aufnahme ansehen">
+        <img id="galleryThumbImg" alt="">
+        <span id="galleryIcon">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+            <rect x="2" y="7" width="16" height="13" rx="2.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+            <path d="M20 10.5l4-2.5v10l-4-2.5v-5z" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linejoin="round"/>
           </svg>
-        </div>
-        <div id="galleryCountBadge">0</div>
-      </div>
+        </span>
+      </button>
 
-      <!-- Capture -->
-      <button id="captureBtn" title="Foto aufnehmen">
-        <div class="capture-outer">
-          <div class="capture-inner"></div>
+      <!-- Shutter -->
+      <button id="shutterBtn">
+        <div class="shutter-ring">
+          <div class="shutter-fill"></div>
         </div>
       </button>
 
-      <!-- Upload overlay -->
+      <!-- Upload reference overlay -->
       <button id="uploadBtn" title="Referenzbild laden">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M12 16V8M9 11l3-3 3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <rect x="3" y="3" width="18" height="18" rx="3" stroke="white" stroke-width="1.5"/>
-          <path d="M8 19h8" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+          <rect x="3" y="3" width="20" height="20" rx="3" stroke="white" stroke-width="1.5"/>
+          <path d="M13 17V10M10 13l3-3 3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9 20h8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
       </button>
     </div>
   </div>
 
-  <input type="file" id="fileInput" accept="image/*">
-  <canvas id="captureCanvas"></canvas>
+  <!-- Hidden file inputs -->
+  <!-- Reference image overlay: from gallery/files -->
+  <input type="file" id="overlayInput" accept="image/*">
+  <!-- For opening last captured photo in device gallery -->
+  <input type="file" id="viewLastInput" accept="image/*" capture>
+
+  <!-- Hidden canvas for capture -->
+  <canvas id="canvas"></canvas>
 </div>
 
-<!-- ─── GALLERY SCREEN ─── -->
-<div id="galleryScreen" class="screen">
-  <div id="galleryHeader">
-    <button class="nav-btn" id="galleryBackBtn">Zurück</button>
-    <div>
-      <h2>Aufnahmen</h2>
-      <div id="photoCount" style="text-align:center">0 Fotos</div>
-    </div>
-    <button class="nav-btn right" id="selectBtn">Auswählen</button>
-  </div>
-  <div id="galleryGrid"></div>
-  <div id="selectBar" style="display:none; padding: 12px 20px calc(var(--safe-bottom) + 12px); background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); display:none; flex-direction:row; align-items:center; justify-content:space-between;">
-    <button class="viewer-action danger" id="deleteSelectedBtn">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="#FF453A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>Löschen</span>
-    </button>
-    <span id="selectedCount" style="font-size:13px;color:rgba(255,255,255,0.6)">0 ausgewählt</span>
-    <button class="viewer-action" id="downloadSelectedBtn">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3v13M8 12l4 4 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20h16" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <span>Laden</span>
-    </button>
-  </div>
-</div>
-
-<!-- ─── VIEWER SCREEN ─── -->
-<div id="viewerScreen" class="screen">
-  <div id="viewerHeader">
-    <button class="nav-btn" id="viewerBackBtn">Zurück</button>
-    <div id="viewerDate"></div>
-    <button class="nav-btn right" style="min-width:50px"></button>
-  </div>
-  <div id="viewerBody">
-    <img id="viewerImg" alt="">
-  </div>
-  <div id="viewerFooter">
-    <button class="viewer-action danger" id="deletePhotoBtn">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="#FF453A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>Löschen</span>
-    </button>
-    <button class="viewer-action" id="downloadPhotoBtn">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 3v13M8 12l4 4 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20h16" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <span>Laden</span>
-    </button>
-  </div>
-</div>
+<!-- ════ TOAST ════ -->
+<div id="toast"></div>
 
 <script>
-// ─── STATE ───────────────────────────────────────────────────────────────────
-const state = {
-  photos: [],         // [{dataUrl, filename, date}]
-  currentViewer: null,
-  stream: null,
-  overlayDataUrl: null,
-  isPortrait: true,
-  selectMode: false,
-  selected: new Set()
-};
+'use strict';
 
-// ─── SCREEN NAVIGATION ────────────────────────────────────────────────────────
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+/* ─────────────────────────────────────────
+   UTILITIES
+───────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+
+function showToast(msg, duration = 2200) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => t.classList.remove('show'), duration);
 }
 
-// ─── CAMERA ──────────────────────────────────────────────────────────────────
-async function startCamera() {
-  showScreen('cameraScreen');
-  try {
+function dataUrlToBlob(dataUrl) {
+  const [header, data] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)[1];
+  const binary = atob(data);
+  const arr = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+function getFilename() {
+  const now = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `timelapse_${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}.jpg`;
+}
+
+/* ─────────────────────────────────────────
+   SCREEN MANAGER
+───────────────────────────────────────── */
+const screens = ['startScreen','permScreen','camScreen'];
+
+function showScreen(id) {
+  screens.forEach(s => $( s).classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+/* ─────────────────────────────────────────
+   CAMERA MODULE
+   
+   Fix: simplified constraints, explicit play(),
+   GPU composite layer (translateZ), no dimension constraints
+───────────────────────────────────────── */
+const Camera = {
+  stream: null,
+
+  async start() {
+    const video = $('video');
+
+    // Stop any existing stream
+    Camera.stop();
+
     const constraints = {
       video: {
-        facingMode: 'environment',
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
+        facingMode: { ideal: 'environment' }
+        // No width/height ideal – let browser pick best
       },
       audio: false
     };
-    state.stream = await navigator.mediaDevices.getUserMedia(constraints);
-    document.getElementById('videoEl').srcObject = state.stream;
-  } catch (e) {
-    showScreen('permissionScreen');
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      Camera.stream = stream;
+      video.srcObject = stream;
+
+      // Must explicitly call play() on iOS Safari after setting srcObject
+      await video.play();
+
+      showScreen('camScreen');
+    } catch (err) {
+      console.error('Camera error:', err.name, err.message);
+      showScreen('permScreen');
+    }
+  },
+
+  stop() {
+    if (Camera.stream) {
+      Camera.stream.getTracks().forEach(t => t.stop());
+      Camera.stream = null;
+    }
+    const v = $('video');
+    v.srcObject = null;
   }
-}
+};
 
-function stopCamera() {
-  if (state.stream) {
-    state.stream.getTracks().forEach(t => t.stop());
-    state.stream = null;
-  }
-}
+/* ─────────────────────────────────────────
+   OVERLAY MODULE
+───────────────────────────────────────── */
+const Overlay = {
+  loaded: false,
 
-// ─── CAPTURE ─────────────────────────────────────────────────────────────────
-function capturePhoto() {
-  const video = document.getElementById('videoEl');
-  const canvas = document.getElementById('captureCanvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0);
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-
-  // Filename
-  const now = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  const filename = `timelapse_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.jpg`;
-
-  state.photos.unshift({ dataUrl, filename, date: now });
-  updateGalleryThumb();
-  updateGalleryCountBadge();
-
-  // Flash
-  const flash = document.getElementById('flashEl');
-  flash.style.opacity = 1;
-  setTimeout(() => { flash.style.opacity = 0; }, 80);
-}
-
-function updateGalleryThumb() {
-  const thumb = document.getElementById('galleryThumb');
-  if (state.photos.length > 0) {
-    thumb.innerHTML = `<img src="${state.photos[0].dataUrl}" alt="">`;
-  } else {
-    thumb.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="7" width="12" height="10" rx="2" stroke="white" stroke-width="1.5"/><path d="M17 9l4-2v10l-4-2V9z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
-  }
-}
-
-function updateGalleryCountBadge() {
-  const badge = document.getElementById('galleryCountBadge');
-  if (state.photos.length > 0) {
-    badge.textContent = state.photos.length > 99 ? '99+' : state.photos.length;
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-// ─── OVERLAY ─────────────────────────────────────────────────────────────────
-function setOverlay(dataUrl) {
-  const img = document.getElementById('overlayImg');
-  const indicator = document.getElementById('overlayIndicator');
-  if (dataUrl) {
-    img.src = dataUrl;
-    img.style.display = 'block';
-    indicator.style.display = 'block';
-    setTimeout(() => { indicator.style.display = 'none'; }, 2500);
-  } else {
-    img.style.display = 'none';
-    indicator.style.display = 'none';
-  }
-}
-
-// ─── GALLERY ─────────────────────────────────────────────────────────────────
-function renderGallery() {
-  const grid = document.getElementById('galleryGrid');
-  const count = document.getElementById('photoCount');
-  count.textContent = `${state.photos.length} Foto${state.photos.length !== 1 ? 's' : ''}`;
-
-  if (state.photos.length === 0) {
-    grid.innerHTML = `<div class="empty-gallery">
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="6" y="12" width="28" height="22" rx="4" stroke="white" stroke-width="2"/><circle cx="18" cy="23" r="4" stroke="white" stroke-width="2"/><path d="M34 18V10M30 14h8" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M10 34l8-8 5 5 5-6 6 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <p>Noch keine Fotos aufgenommen.<br>Öffne die Kamera und schieß los!</p>
-    </div>`;
-    return;
-  }
-
-  grid.innerHTML = state.photos.map((p, i) => `
-    <div class="photo-cell ${state.selected.has(i) ? 'selected' : ''}" data-index="${i}">
-      <img src="${p.dataUrl}" alt="">
-      <div class="check">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </div>
-    </div>
-  `).join('');
-
-  grid.querySelectorAll('.photo-cell').forEach(cell => {
-    cell.addEventListener('click', () => {
-      const idx = parseInt(cell.dataset.index);
-      if (state.selectMode) {
-        toggleSelect(idx);
-      } else {
-        openViewer(idx);
-      }
-    });
-  });
-}
-
-function toggleSelect(idx) {
-  if (state.selected.has(idx)) state.selected.delete(idx);
-  else state.selected.add(idx);
-  updateSelectBar();
-  renderGallery();
-}
-
-function updateSelectBar() {
-  const bar = document.getElementById('selectBar');
-  const selCount = document.getElementById('selectedCount');
-  selCount.textContent = `${state.selected.size} ausgewählt`;
-  if (state.selectMode) bar.style.display = 'flex';
-  else bar.style.display = 'none';
-}
-
-// ─── VIEWER ──────────────────────────────────────────────────────────────────
-function openViewer(index) {
-  state.currentViewer = index;
-  const photo = state.photos[index];
-  document.getElementById('viewerImg').src = photo.dataUrl;
-  const d = photo.date;
-  const pad = n => String(n).padStart(2,'0');
-  document.getElementById('viewerDate').textContent =
-    `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  showScreen('viewerScreen');
-}
-
-function downloadPhoto(photo) {
-  const a = document.createElement('a');
-  a.href = photo.dataUrl;
-  a.download = photo.filename;
-  a.click();
-}
-
-function deletePhoto(index) {
-  state.photos.splice(index, 1);
-  updateGalleryThumb();
-  updateGalleryCountBadge();
-}
-
-// ─── ORIENTATION ─────────────────────────────────────────────────────────────
-function toggleOrientation() {
-  const btn = document.getElementById('rotateBtn');
-  btn.classList.add('rotating');
-  setTimeout(() => btn.classList.remove('rotating'), 400);
-
-  if (screen.orientation && screen.orientation.lock) {
-    state.isPortrait = !state.isPortrait;
-    screen.orientation.lock(state.isPortrait ? 'portrait' : 'landscape').catch(() => {});
-  } else if (window.screen.orientation) {
-    // Fallback: just toggle class
-    document.body.style.transform = state.isPortrait ? 'rotate(90deg)' : '';
-    state.isPortrait = !state.isPortrait;
-  }
-}
-
-// ─── FILE UPLOAD ─────────────────────────────────────────────────────────────
-function handleFileUpload(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      // Resize if too large
-      const MAX = 4096;
-      if (img.width > MAX || img.height > MAX) {
-        const canvas = document.createElement('canvas');
-        const ratio = Math.min(MAX / img.width, MAX / img.height);
-        canvas.width = img.width * ratio;
-        canvas.height = img.height * ratio;
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        state.overlayDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      } else {
-        state.overlayDataUrl = e.target.result;
-      }
-      setOverlay(state.overlayDataUrl);
+  load(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        // Resize if > 4096px to avoid memory issues on mobile
+        const MAX = 4096;
+        if (img.width > MAX || img.height > MAX) {
+          const cv = document.createElement('canvas');
+          const r = Math.min(MAX / img.width, MAX / img.height);
+          cv.width = Math.round(img.width * r);
+          cv.height = Math.round(img.height * r);
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          Overlay._apply(cv.toDataURL('image/jpeg', 0.9));
+        } else {
+          Overlay._apply(e.target.result);
+        }
+      };
+      img.src = e.target.result;
     };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
+    reader.readAsDataURL(file);
+  },
 
-// ─── EVENT LISTENERS ─────────────────────────────────────────────────────────
-document.getElementById('startCameraBtn').addEventListener('click', startCamera);
+  _apply(src) {
+    const el = $('overlayImg');
+    el.src = src;
+    el.style.display = 'block';
+    Overlay.loaded = true;
 
-document.getElementById('goToGalleryBtn').addEventListener('click', () => {
-  renderGallery();
-  showScreen('galleryScreen');
-});
+    // Show slider
+    $('sliderRow').style.display = 'flex';
 
-document.getElementById('retryBtn').addEventListener('click', startCamera);
-document.getElementById('backFromPermBtn').addEventListener('click', () => showScreen('startScreen'));
+    // Show badge briefly
+    const badge = $('overlayActiveBadge');
+    badge.style.display = 'block';
+    setTimeout(() => badge.style.display = 'none', 2500);
 
-document.getElementById('backBtn').addEventListener('click', () => {
-  stopCamera();
+    // Hide hint
+    $('noOverlayHint').style.display = 'none';
+
+    showToast('✓ Referenzbild geladen');
+  },
+
+  setOpacity(val) {
+    $('overlayImg').style.opacity = val / 100;
+    $('opacityLabel').textContent = `${val}%`;
+  }
+};
+
+/* ─────────────────────────────────────────
+   CAPTURE MODULE
+───────────────────────────────────────── */
+const Capture = {
+  lastDataUrl: null,
+  lastFilename: null,
+
+  async shoot() {
+    const video = $('video');
+    const canvas = $('canvas');
+
+    if (!video.videoWidth) {
+      showToast('Kamera nicht bereit');
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+
+    // Flip if front camera (not used here, but defensive)
+    ctx.drawImage(video, 0, 0);
+
+    const filename = getFilename();
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    Capture.lastDataUrl = dataUrl;
+    Capture.lastFilename = filename;
+
+    // Flash effect
+    const flash = $('flash');
+    flash.style.opacity = 1;
+    setTimeout(() => flash.style.opacity = 0, 80);
+
+    // Update gallery thumbnail
+    const thumbImg = $('galleryThumbImg');
+    thumbImg.src = dataUrl;
+    thumbImg.style.display = 'block';
+    $('galleryIcon').style.display = 'none';
+
+    // Save to device
+    await Capture.saveToDevice(dataUrl, filename);
+  },
+
+  async saveToDevice(dataUrl, filename) {
+    const blob = dataUrlToBlob(dataUrl);
+    const file = new File([blob], filename, { type: 'image/jpeg' });
+
+    // Web Share API – opens iOS share sheet → user can "In Fotos sichern"
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Timelapse Aufnahme'
+        });
+        showToast('✓ Gespeichert');
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // User cancelled or share failed, fallback to download
+          Capture._fallbackDownload(dataUrl, filename);
+        }
+      }
+    } else {
+      // Fallback for non-supporting browsers
+      Capture._fallbackDownload(dataUrl, filename);
+    }
+  },
+
+  _fallbackDownload(dataUrl, filename) {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('✓ Foto heruntergeladen');
+  },
+
+  // Re-share last photo (tapping gallery thumb)
+  async shareLastPhoto() {
+    if (!Capture.lastDataUrl) {
+      showToast('Noch kein Foto aufgenommen');
+      return;
+    }
+    await Capture.saveToDevice(Capture.lastDataUrl, Capture.lastFilename);
+  }
+};
+
+/* ─────────────────────────────────────────
+   ORIENTATION MODULE
+   
+   Fix: screen.orientation.lock only in fullscreen (not available
+   in Safari). Instead we just show a toast about rotating the phone.
+───────────────────────────────────────── */
+const OrientationCtrl = {
+  toggle() {
+    const icon = $('rotateIcon');
+    icon.classList.remove('spin');
+    // Trigger reflow
+    void icon.offsetWidth;
+    icon.classList.add('spin');
+    setTimeout(() => icon.classList.remove('spin'), 400);
+
+    showToast('Drehe dein iPhone um 90°', 2000);
+  }
+};
+
+/* ─────────────────────────────────────────
+   EVENT WIRING
+───────────────────────────────────────── */
+
+// Start screen
+$('startBtn').addEventListener('click', () => Camera.start());
+
+// Permission screen
+$('retryBtn').addEventListener('click', () => Camera.start());
+$('permBackBtn').addEventListener('click', () => {
+  Camera.stop();
   showScreen('startScreen');
 });
 
-document.getElementById('captureBtn').addEventListener('click', capturePhoto);
-
-document.getElementById('rotateBtn').addEventListener('click', toggleOrientation);
-
-document.getElementById('uploadBtn').addEventListener('click', () => {
-  document.getElementById('fileInput').click();
+// Back to start
+$('backBtn').addEventListener('click', () => {
+  Camera.stop();
+  $('overlayImg').src = '';
+  $('overlayImg').style.display = 'none';
+  $('noOverlayHint').style.display = 'block';
+  $('sliderRow').style.display = 'none';
+  $('opacitySlider').value = 50;
+  $('opacityLabel').textContent = '50%';
+  $('galleryThumbImg').style.display = 'none';
+  $('galleryThumbImg').src = '';
+  $('galleryIcon').style.display = 'flex';
+  Overlay.loaded = false;
+  Capture.lastDataUrl = null;
+  Capture.lastFilename = null;
+  showScreen('startScreen');
 });
 
-document.getElementById('fileInput').addEventListener('change', e => {
-  handleFileUpload(e.target.files[0]);
-  e.target.value = '';
+// Shutter
+$('shutterBtn').addEventListener('click', () => Capture.shoot());
+
+// Upload reference overlay
+$('uploadBtn').addEventListener('click', () => $('overlayInput').click());
+$('overlayInput').addEventListener('change', e => {
+  Overlay.load(e.target.files[0]);
+  e.target.value = ''; // reset so same file can be re-selected
 });
 
-document.getElementById('opacitySlider').addEventListener('input', e => {
-  const val = e.target.value;
-  document.getElementById('overlayImg').style.opacity = val / 100;
-  document.getElementById('opacityBadge').textContent = `${val}%`;
-  document.getElementById('opacityVal').textContent = `${val}%`;
+// Gallery thumb → share/save last photo
+$('galleryBtn').addEventListener('click', () => Capture.shareLastPhoto());
+
+// Opacity slider
+$('opacitySlider').addEventListener('input', e => {
+  Overlay.setOpacity(parseInt(e.target.value));
 });
 
-document.getElementById('galleryThumb').addEventListener('click', () => {
-  renderGallery();
-  showScreen('galleryScreen');
+// Rotate hint
+$('rotateBtn').addEventListener('click', () => OrientationCtrl.toggle());
+
+/* ─────────────────────────────────────────
+   VIDEO STALL WATCHDOG
+   If video stops rendering (black screen), restart
+───────────────────────────────────────── */
+const video = $('video');
+video.addEventListener('loadedmetadata', () => {
+  video.play().catch(err => console.warn('Play error:', err));
+});
+video.addEventListener('stalled', () => {
+  console.warn('Video stalled – attempting restart');
+  if (Camera.stream) {
+    video.srcObject = Camera.stream;
+    video.play().catch(() => {});
+  }
 });
 
-document.getElementById('galleryBackBtn').addEventListener('click', () => {
-  state.selectMode = false;
-  state.selected.clear();
-  document.getElementById('selectBtn').textContent = 'Auswählen';
-  document.getElementById('selectBar').style.display = 'none';
-  showScreen('cameraScreen');
-});
-
-document.getElementById('selectBtn').addEventListener('click', () => {
-  state.selectMode = !state.selectMode;
-  state.selected.clear();
-  document.getElementById('selectBtn').textContent = state.selectMode ? 'Fertig' : 'Auswählen';
-  updateSelectBar();
-  renderGallery();
-});
-
-document.getElementById('deleteSelectedBtn').addEventListener('click', () => {
-  if (state.selected.size === 0) return;
-  const indices = Array.from(state.selected).sort((a,b) => b-a);
-  indices.forEach(i => deletePhoto(i));
-  state.selected.clear();
-  state.selectMode = false;
-  document.getElementById('selectBtn').textContent = 'Auswählen';
-  updateSelectBar();
-  renderGallery();
-});
-
-document.getElementById('downloadSelectedBtn').addEventListener('click', () => {
-  state.selected.forEach(i => downloadPhoto(state.photos[i]));
-});
-
-document.getElementById('viewerBackBtn').addEventListener('click', () => {
-  renderGallery();
-  showScreen('galleryScreen');
-});
-
-document.getElementById('downloadPhotoBtn').addEventListener('click', () => {
-  downloadPhoto(state.photos[state.currentViewer]);
-});
-
-document.getElementById('deletePhotoBtn').addEventListener('click', () => {
-  deletePhoto(state.currentViewer);
-  renderGallery();
-  showScreen('galleryScreen');
-});
-
-// Swipe back from viewer
-let touchStartX = 0;
-document.getElementById('viewerScreen').addEventListener('touchstart', e => {
-  touchStartX = e.touches[0].clientX;
-});
-document.getElementById('viewerScreen').addEventListener('touchend', e => {
-  const dx = e.changedTouches[0].clientX - touchStartX;
-  if (dx > 80 && touchStartX < 50) {
-    renderGallery();
-    showScreen('galleryScreen');
+/* ─────────────────────────────────────────
+   VISIBILITY CHANGE
+   Restore camera when app comes back to foreground
+───────────────────────────────────────── */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && $('camScreen').classList.contains('active')) {
+    if (!Camera.stream) {
+      Camera.start();
+    } else if (video.paused) {
+      video.play().catch(() => {});
+    }
   }
 });
 </script>
