@@ -1,1093 +1,906 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Timelapse Overlay</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>JH · Erinnerungen</title>
+
+<!-- ══════════════════════════════════════════════════════
+  🔒 FIX #7 — Content Security Policy
+  Erlaubt nur exakt die benötigten Quellen.
+  'unsafe-inline' bei style/script ist für Firebase ESM nötig.
+══════════════════════════════════════════════════════ -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self' https://www.gstatic.com 'unsafe-inline';
+  connect-src https://*.googleapis.com https://*.firebaseio.com https://firestore.googleapis.com https://api.cloudinary.com;
+  img-src 'self' https://res.cloudinary.com blob: data:;
+  style-src 'self' https://fonts.googleapis.com 'unsafe-inline';
+  font-src https://fonts.gstatic.com;
+">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-
-/* ══════════════════════════════════════════
-   RESET & VARIABLES
-══════════════════════════════════════════ */
-
-*, *::before, *::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-}
-
+/* ═══════════════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════════════ */
 :root {
-  --safe-top:    env(safe-area-inset-top,    44px);
-  --safe-bottom: env(safe-area-inset-bottom, 34px);
-  --accent:  #0A84FF;
-  --yellow:  #FFD60A;
-  --danger:  #FF453A;
-  --surface: rgba(28, 28, 30, 0.94);
-  --text:    #ffffff;
-  --text2:   rgba(255, 255, 255, 0.55);
+  --card-size: 200px;
+  --bg:        #faf6f0;
+  --bg2:       #f3ede4;
+  --bg3:       #ede5d8;
+  --surface:   #ffffff;
+  --accent:    #b07d55;
+  --accent2:   #d4a574;
+  --accent3:   #e8cba8;
+  --text:      #2c1f14;
+  --text2:     #6b5040;
+  --text3:     #a08070;
+  --line:      #d8c8b5;
+  --line2:     #c4b09a;
+  --gold:      #9a6f3f;
+  --red:       #c0503a;
+  --green:     #4a8a5a;
+  --s1: 0 2px 8px rgba(100,60,20,.10);
+  --s2: 0 6px 24px rgba(100,60,20,.14);
+  --s3: 0 16px 56px rgba(100,60,20,.18);
 }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;overflow:hidden;overscroll-behavior:none;}
 
-html {
-  height: -webkit-fill-available;
-  /* FIX: prevent pull-to-refresh in Safari */
-  overscroll-behavior: none;
+/* ─── PIN SCREEN ─── */
+#pin-screen{
+  position:fixed;inset:0;z-index:1000;
+  background:linear-gradient(155deg,#fdf9f3 0%,#ede0cc 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;
 }
+.pin-logo{font-family:'Cormorant Garamond',serif;font-size:3.4rem;font-weight:600;color:var(--gold);letter-spacing:.12em;text-align:center;animation:logoIn .8s cubic-bezier(.22,1,.36,1) both;}
+.pin-logo small{display:block;font-size:.65rem;font-family:'Outfit',sans-serif;font-weight:400;color:var(--text3);letter-spacing:.24em;text-transform:uppercase;margin-top:6px;}
+@keyframes logoIn{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+.pin-dots{display:flex;gap:14px;animation:fadeIn .5s .3s both;}
+.pin-dot{width:13px;height:13px;border-radius:50%;border:2px solid var(--line2);background:transparent;transition:background .18s,transform .15s,border-color .18s;}
+.pin-dot.filled{background:var(--accent);border-color:var(--accent);transform:scale(1.3);}
+.pin-grid{display:grid;grid-template-columns:repeat(3,70px);gap:10px;animation:fadeIn .5s .4s both;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.pin-btn{height:70px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--text);font-family:'Outfit',sans-serif;font-size:1.4rem;font-weight:300;cursor:pointer;box-shadow:var(--s1);transition:background .12s,transform .1s;display:flex;align-items:center;justify-content:center;}
+.pin-btn:active{background:var(--accent);color:#fff;transform:scale(.88);border-color:var(--accent);}
+.pin-btn.del{font-size:1rem;color:var(--text3);}
+.pin-error{color:var(--red);font-size:.82rem;opacity:0;transition:opacity .3s;height:18px;text-align:center;animation:fadeIn .5s .5s both;}
+.pin-error.show{opacity:1;}
+.pin-shake{animation:shake .35s ease both !important;}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
 
-body {
-  width: 100%;
-  height: 100vh;
-  height: -webkit-fill-available;
-  overflow: hidden;
-  position: fixed;
-  top: 0; left: 0;
-  background: #000;
-  color: var(--text);
-  font-family: -apple-system, 'Helvetica Neue', sans-serif;
-  /* FIX: prevent bounce/pull-to-refresh on touch */
-  touch-action: none;
-  overscroll-behavior: none;
+/* ─── LOCKOUT SCREEN (over PIN screen) ─── */
+#lockout-banner{
+  position:absolute;bottom:40px;left:0;right:0;text-align:center;
+  font-size:.8rem;color:var(--red);font-weight:500;
+  opacity:0;transition:opacity .3s;pointer-events:none;
 }
+#lockout-banner.show{opacity:1;}
+#lockout-countdown{font-variant-numeric:tabular-nums;font-size:1.1em;font-weight:600;}
 
-/* ══════════════════════════════════════════
-   SCREEN SYSTEM
-══════════════════════════════════════════ */
+/* ─── APP ─── */
+#app{height:100%;display:flex;flex-direction:column;opacity:0;transition:opacity .4s;}
+#app.ready{opacity:1;}
 
-.screen {
-  position: fixed;
-  inset: 0;
-  height: 100vh;
-  height: -webkit-fill-available;
-  display: none;
-  background: #000;
-}
-.screen.active { display: flex; }
+/* ─── HEADER ─── */
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 10px;background:var(--surface);border-bottom:1px solid var(--line);flex-shrink:0;z-index:10;box-shadow:0 1px 14px rgba(100,60,20,.07);}
+.app-title{font-family:'Cormorant Garamond',serif;font-size:1.65rem;font-weight:600;color:var(--gold);letter-spacing:.1em;line-height:1;}
+.app-title small{display:block;font-size:.58rem;font-family:'Outfit',sans-serif;font-weight:400;color:var(--text3);letter-spacing:.2em;text-transform:uppercase;margin-top:3px;}
+.hdr-r{display:flex;align-items:center;gap:7px;}
+#photo-count{font-size:.68rem;color:var(--text3);letter-spacing:.06em;}
+.icon-btn{width:36px;height:36px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg2);color:var(--text2);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .18s;box-shadow:var(--s1);}
+.icon-btn:active{background:var(--accent);border-color:var(--accent);color:#fff;transform:scale(.88);}
 
-/* ══════════════════════════════════════════
-   START SCREEN
-══════════════════════════════════════════ */
+/* ─── TIMELINE WRAPPER ─── */
+#timeline-wrapper{flex:1;overflow:hidden;position:relative;touch-action:none;background:linear-gradient(175deg,#fdfaf5 0%,#f4ead8 100%);}
+#timeline-wrapper::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,var(--line) 1px,transparent 1px);background-size:32px 32px;opacity:.22;}
 
-#screen-start {
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 32px;
-  padding-top:    calc(var(--safe-top)    + 20px);
-  padding-bottom: calc(var(--safe-bottom) + 20px);
-  gap: 0;
-}
+/* ─── AXIS ─── */
+.timeline-axis{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent 0%,var(--line2) 6%,var(--line2) 94%,transparent 100%);pointer-events:none;z-index:2;}
+.timeline-axis::after{content:'';position:absolute;inset:-3px 0;background:linear-gradient(90deg,transparent 0%,var(--accent3) 6%,var(--accent3) 94%,transparent 100%);opacity:.45;filter:blur(5px);}
 
-.app-icon {
-  width: 88px;
-  height: 88px;
-  background: linear-gradient(145deg, #1c1c1e, #2c2c2e);
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 22px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07);
-}
+/* ─── MONTH INDICATOR ─── */
+#month-indicator{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:5px 14px;font-size:.72rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);box-shadow:var(--s1);pointer-events:none;z-index:20;opacity:0;transition:opacity .35s;white-space:nowrap;}
+#month-indicator.show{opacity:1;}
 
-.app-title {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  margin-bottom: 10px;
-}
+/* ─── SCROLL AREA ─── */
+#timeline{height:100%;overflow-x:auto;overflow-y:hidden;display:flex;align-items:flex-start;padding:0 80px;position:relative;scrollbar-width:none;-webkit-overflow-scrolling:touch;will-change:transform;}
+#timeline::-webkit-scrollbar{display:none;}
 
-.app-subtitle {
-  font-size: 15px;
-  color: var(--text2);
-  text-align: center;
-  line-height: 1.5;
-  max-width: 270px;
-  margin-bottom: 48px;
-}
+/* ─── CARDS ─── */
+.card{flex-shrink:0;position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;opacity:0;}
+.card.visible{animation:cardIn .45s cubic-bezier(.22,1,.36,1) forwards;}
+@keyframes cardIn{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+.card-ripple{position:absolute;border-radius:50%;background:rgba(176,125,85,.25);pointer-events:none;transform:scale(0);animation:ripple .55s ease-out forwards;z-index:10;}
+@keyframes ripple{to{transform:scale(4);opacity:0;}}
+.card-date{font-family:'Outfit',sans-serif;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);background:var(--surface);border:1px solid var(--line);border-radius:20px;white-space:nowrap;box-shadow:var(--s1);z-index:3;flex-shrink:0;}
+.card-conn{width:1.5px;background:var(--line2);flex-shrink:0;}
+.card-dot{border-radius:50%;background:var(--accent);border:2.5px solid var(--surface);flex-shrink:0;z-index:3;transition:box-shadow .2s,transform .2s;}
+.card:hover .card-dot,.card:active .card-dot{transform:scale(1.3);box-shadow:0 0 0 4px rgba(212,165,116,.5)!important;}
+.card-media{width:100%;position:relative;overflow:hidden;border:2.5px solid var(--surface);box-shadow:var(--s2);background:var(--bg3);flex-shrink:0;transition:transform .22s cubic-bezier(.22,1,.36,1),box-shadow .22s;}
+.card:active .card-media{transform:scale(.96);box-shadow:var(--s1);}
+.card-media::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(44,31,20,.25) 100%);pointer-events:none;}
+.card-media img{width:100%;height:100%;object-fit:cover;display:block;}
+.card-media img.loading{opacity:0;transition:opacity .5s;}
+.card-media img.loaded{opacity:1;}
+.card-caption{font-size:.68rem;color:var(--text2);line-height:1.4;text-align:center;padding:5px 3px 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%;}
+.year-sep{flex-shrink:0;display:flex;align-items:flex-start;}
+.year-pill{font-family:'Cormorant Garamond',serif;font-weight:600;color:var(--accent2);background:rgba(255,255,255,.8);border:1px solid var(--line);border-radius:24px;padding:4px 12px;white-space:nowrap;box-shadow:var(--s1);z-index:4;flex-shrink:0;pointer-events:none;backdrop-filter:blur(4px);}
 
-.btn {
-  width: 100%;
-  max-width: 300px;
-  padding: 16px;
-  border: none;
-  border-radius: 13px;
-  font-size: 17px;
-  font-weight: 600;
-  color: #fff;
-  cursor: pointer;
-  letter-spacing: -0.2px;
-  transition: opacity 0.1s;
-}
-.btn:active { opacity: 0.65; }
-.btn-primary   { background: var(--accent); }
-.btn-secondary { background: rgba(255,255,255,0.12); margin-top: 12px; }
+/* ─── DELETE CONFIRM ─── */
+#delete-confirm{position:fixed;inset:0;z-index:500;background:rgba(12,8,4,.75);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;opacity:0;pointer-events:none;transition:opacity .28s;}
+#delete-confirm.show{opacity:1;pointer-events:all;}
+.del-box{background:var(--surface);border-radius:22px;padding:30px 28px;text-align:center;box-shadow:var(--s3);max-width:300px;width:90%;}
+.del-box .del-icon{font-size:2.4rem;margin-bottom:10px;}
+.del-box h3{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--text);margin-bottom:8px;}
+.del-box p{font-size:.82rem;color:var(--text3);line-height:1.5;margin-bottom:22px;}
+.del-actions{display:flex;gap:10px;}
+.btn-cancel{flex:1;padding:12px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg2);color:var(--text2);font-family:'Outfit',sans-serif;font-size:.9rem;cursor:pointer;transition:background .15s;}
+.btn-cancel:active{background:var(--bg3);}
+.btn-del-ok{flex:1;padding:12px;border-radius:12px;border:none;background:var(--red);color:#fff;font-family:'Outfit',sans-serif;font-size:.9rem;font-weight:500;cursor:pointer;box-shadow:0 4px 12px rgba(192,80,58,.35);transition:opacity .15s;}
+.btn-del-ok:active{opacity:.8;}
 
-/* ══════════════════════════════════════════
-   PERMISSION SCREEN
-══════════════════════════════════════════ */
+/* ─── ZOOM BADGE ─── */
+#zoom-badge{position:fixed;top:64px;right:13px;z-index:50;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px 10px;font-size:.68rem;color:var(--text3);box-shadow:var(--s1);pointer-events:none;opacity:0;transition:opacity .35s;font-variant-numeric:tabular-nums;}
+#zoom-badge.show{opacity:1;}
 
-#screen-permission {
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 32px;
-  text-align: center;
-  gap: 12px;
-}
+/* ─── EMPTY STATE ─── */
+#empty-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;pointer-events:none;}
+.empty-icon{font-size:2.8rem;opacity:.25;animation:float 3s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.empty-text{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.15rem;color:var(--text3);}
 
-#screen-permission .perm-icon { font-size: 60px; margin-bottom: 8px; }
-#screen-permission h2 { font-size: 22px; font-weight: 700; }
-#screen-permission p  { color: var(--text2); font-size: 15px; line-height: 1.5; max-width: 270px; }
+/* ─── FAB ─── */
+#fab{position:fixed;bottom:22px;right:17px;z-index:100;width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;color:#fff;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 20px rgba(176,125,85,.5);display:flex;align-items:center;justify-content:center;transition:transform .28s cubic-bezier(.34,1.56,.64,1),background .2s,box-shadow .2s;}
+#fab.open{background:#8a6050;transform:rotate(45deg);box-shadow:0 4px 12px rgba(100,50,30,.3);}
 
-/* ══════════════════════════════════════════
-   CAMERA SCREEN
-   Note: flex-direction not set — children
-   are absolutely positioned layers.
-══════════════════════════════════════════ */
+/* ─── UPLOAD PANEL ─── */
+#upload-panel{position:fixed;bottom:84px;left:10px;right:10px;background:var(--surface);border:1.5px solid var(--line);border-radius:22px;padding:22px 18px 18px;z-index:99;box-shadow:var(--s3);transform:translateY(calc(100% + 120px));transition:transform .38s cubic-bezier(.34,1.56,.64,1);max-height:78vh;overflow-y:auto;}
+#upload-panel.open{transform:translateY(0);}
+.panel-title{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:600;color:var(--gold);margin-bottom:18px;}
+.form-group{margin-bottom:13px;}
+.form-lbl{display:block;font-size:.67rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:5px;font-weight:500;}
+.form-input{width:100%;padding:10px 13px;background:var(--bg);border:1.5px solid var(--line);border-radius:10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;outline:none;transition:border-color .2s;}
+.form-input:focus{border-color:var(--accent);}
+input[type="date"]::-webkit-calendar-picker-indicator{filter:opacity(.4);cursor:pointer;}
+.file-row{display:flex;gap:10px;align-items:stretch;}
+.file-btn{flex:1;padding:12px 8px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--text2);font-family:'Outfit',sans-serif;font-size:.74rem;font-weight:400;transition:border-color .2s,background .15s;}
+.file-btn:active{border-color:var(--accent);background:var(--bg2);}
+.file-btn input{display:none;}
+.file-btn-icon{font-size:1.5rem;}
+#preview-thumb{width:64px;height:64px;border-radius:10px;object-fit:cover;display:none;border:2px solid var(--accent);flex-shrink:0;}
 
-#screen-camera {
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-  /* FIX: allow touch events inside but block overscroll */
-  touch-action: none;
-}
+/* 🔒 File validation feedback */
+.file-error{font-size:.72rem;color:var(--red);margin-top:5px;min-height:16px;display:none;}
+.file-error.show{display:block;}
 
-/* Layer 1: Video */
-#video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background: #000;
-  /* GPU compositing layer prevents black frames */
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-}
+.save-btn{width:100%;padding:13px;margin-top:8px;background:var(--accent);border:none;border-radius:12px;color:#fff;font-family:'Outfit',sans-serif;font-size:.92rem;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .18s,transform .12s;box-shadow:0 4px 14px rgba(176,125,85,.3);}
+.save-btn:disabled{opacity:.4;pointer-events:none;}
+.save-btn:active{transform:scale(.96);}
+.prog-wrap{height:3px;border-radius:2px;background:var(--line);margin-top:10px;overflow:hidden;}
+.prog-bar{height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width .3s;}
+.status-msg{text-align:center;font-size:.78rem;color:var(--text3);margin-top:7px;min-height:18px;}
 
-/* Layer 2: Overlay image
-   MUST use same object-fit as video for pixel-perfect alignment */
-#overlay-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;        /* matches video — same crop, same scale */
-  object-position: center;  /* matches video default */
-  opacity: 0.5;
-  pointer-events: none;
-  display: none;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-}
+/* ─── LIGHTBOX ─── */
+#lightbox{position:fixed;inset:0;z-index:200;background:rgba(10,6,2,.91);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;touch-action:none;}
+#lightbox.open{opacity:1;pointer-events:all;}
+#lb-topbar{position:absolute;top:0;left:0;right:0;padding:16px;display:flex;align-items:center;justify-content:space-between;z-index:5;background:linear-gradient(180deg,rgba(10,6,2,.7) 0%,transparent 100%);}
+#lb-back{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:20px;padding:7px 14px;color:rgba(255,255,255,.75);font-size:.75rem;letter-spacing:.08em;cursor:pointer;backdrop-filter:blur(4px);transition:background .18s;font-family:'Outfit',sans-serif;}
+#lb-back:active{background:rgba(255,255,255,.22);}
+#lb-trash{width:40px;height:40px;border-radius:50%;background:rgba(192,80,58,.18);border:1.5px solid rgba(192,80,58,.35);color:rgba(255,120,100,.8);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .18s;}
+#lb-trash:active{background:rgba(192,80,58,.45);}
+#lb-img-wrap{position:relative;width:100%;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+#lb-img{max-width:92vw;max-height:70vh;border-radius:16px;object-fit:contain;box-shadow:0 24px 80px rgba(0,0,0,.6);user-select:none;pointer-events:none;-webkit-user-drag:none;transition:opacity .22s,transform .22s;}
+#lb-img.out-l{opacity:0;transform:translateX(-15%) scale(.95);}
+#lb-img.out-r{opacity:0;transform:translateX(15%) scale(.95);}
+.lb-arr{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.18);color:#fff;font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);transition:background .18s;z-index:5;}
+.lb-arr:active{background:rgba(255,255,255,.28);}
+#lb-prev{left:11px;}#lb-next{right:11px;}
+#lb-info{padding:12px 24px 20px;text-align:center;flex-shrink:0;}
+#lb-date{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+#lb-cap{font-family:'Cormorant Garamond',serif;font-style:italic;color:rgba(255,255,255,.6);font-size:1.05rem;line-height:1.45;}
+#lb-ctr{font-size:.65rem;color:rgba(255,255,255,.25);margin-top:6px;letter-spacing:.08em;}
+#lb-dots{display:flex;justify-content:center;gap:5px;margin-top:10px;}
+.lb-d{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.18);transition:background .22s,transform .22s;}
+.lb-d.on{background:var(--accent2);transform:scale(1.45);}
+#lb-swipe-hint{position:absolute;top:70px;left:50%;transform:translateX(-50%);font-size:.65rem;letter-spacing:.1em;color:rgba(255,255,255,.2);white-space:nowrap;pointer-events:none;animation:swipeHint 2s 1.5s ease both;}
+@keyframes swipeHint{0%,100%{opacity:0}40%,60%{opacity:1}}
 
-/* Layer 3: Shutter flash */
-#flash {
-  position: absolute;
-  inset: 0;
-  background: #fff;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 20;
-  transition: opacity 0.07s;
-}
+/* ─── CONFETTI ─── */
+.confetti-piece{position:fixed;pointer-events:none;z-index:400;animation:confettiFall var(--dur,1.5s) var(--delay,0s) ease-out forwards;}
+@keyframes confettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1;}100%{transform:translateY(100vh) rotate(720deg);opacity:0;}}
 
-/* Layer 4: Top bar */
-#top-bar {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: calc(var(--safe-top) + 10px) 16px 18px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent);
-}
-
-.icon-btn {
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: none;
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.icon-btn:active { background: rgba(255,255,255,0.2); }
-
-#opacity-badge {
-  background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-radius: 20px;
-  padding: 5px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--yellow);
-  min-width: 52px;
-  text-align: center;
-  /* Hidden when no overlay loaded */
-}
-
-/* Layer 5: No-overlay hint */
-#no-overlay-hint {
-  position: absolute;
-  bottom: 200px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
-  background: rgba(0,0,0,0.52);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 14px;
-  padding: 12px 18px;
-  text-align: center;
-  pointer-events: none;
-  white-space: nowrap;
-}
-#no-overlay-hint p {
-  font-size: 13px;
-  color: rgba(255,255,255,0.75);
-  line-height: 1.5;
-}
-
-/* Layer 6: Bottom controls */
-#bottom-controls {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  z-index: 10;
-  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
-  padding-bottom: calc(var(--safe-bottom) + 6px);
-}
-
-/* Opacity slider row */
-#slider-row {
-  display: none; /* shown only when overlay is loaded */
-  align-items: center;
-  padding: 0 24px 14px;
-  gap: 12px;
-}
-
-.slider-icon { flex-shrink: 0; opacity: 0.5; }
-
-input[type="range"] {
-  -webkit-appearance: none;
-  flex: 1;
-  height: 4px;
-  background: rgba(255,255,255,0.28);
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-  /* Allow horizontal drag on iOS (overrides body touch-action:none) */
-  touch-action: pan-x;
-}
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-}
-
-/* Shutter row — 3-column layout */
-#shutter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 36px 10px;
-}
-
-/* Left: thumbnail of last photo */
-#last-photo-btn {
-  width: 58px;
-  height: 58px;
-  border-radius: 12px;
-  border: 2px solid rgba(255,255,255,0.45);
-  background: rgba(255,255,255,0.08);
-  overflow: hidden;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: opacity 0.1s;
-}
-#last-photo-btn:active { opacity: 0.6; }
-#last-photo-img { width: 100%; height: 100%; object-fit: cover; display: none; }
-#last-photo-icon { display: flex; opacity: 0.5; }
-
-/* Center: shutter button */
-#shutter-btn {
-  width: 78px;
-  height: 78px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-  transition: transform 0.08s;
-}
-#shutter-btn:active { transform: scale(0.91); }
-
-.shutter-ring {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 4px solid #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.shutter-fill {
-  width: 63px;
-  height: 63px;
-  border-radius: 50%;
-  background: #fff;
-}
-
-/* Right: load reference image */
-#load-ref-btn {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255,255,255,0.13);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #fff;
-  flex-shrink: 0;
-  transition: background 0.1s;
-}
-#load-ref-btn:active { background: rgba(255,255,255,0.28); }
-
-/* Hidden inputs */
-#ref-input { display: none; }
-#canvas    { display: none; }
-
-/* ══════════════════════════════════════════
-   SAVE FALLBACK SCREEN
-   Shown when Web Share API is unavailable
-   (file:// protocol, older iOS, non-HTTPS).
-
-   Strategy: show the photo fullscreen.
-   iOS native long-press menu on an <img>
-   always includes "Bild sichern" regardless
-   of protocol — no extra permissions needed.
-══════════════════════════════════════════ */
-
-#screen-save {
-  flex-direction: column;
-  background: #000;
-  /* This screen must allow touch on the image */
-  touch-action: auto;
-}
-
-/* The photo — fills screen, long-press saves it */
-#save-preview-img {
-  flex: 1;
-  width: 100%;
-  object-fit: contain;
-  background: #000;
-  display: block;
-  /* CRITICAL: re-enable iOS long-press context menu */
-  -webkit-touch-callout: default;
-  touch-action: auto;
-  user-select: auto;
-  -webkit-user-select: auto;
-}
-
-/* Pulsing ring animation to draw attention */
-@keyframes pulse-ring {
-  0%   { transform: translate(-50%, -50%) scale(0.92); opacity: 0.9; }
-  50%  { transform: translate(-50%, -50%) scale(1.08); opacity: 0.4; }
-  100% { transform: translate(-50%, -50%) scale(0.92); opacity: 0.9; }
-}
-
-/* Overlay hint on the image */
-#save-hint-overlay {
-  position: absolute;
-  /* Centered in the image area (above the bar) */
-  bottom: calc(100px + var(--safe-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  pointer-events: none; /* let touches pass through to the image */
-  z-index: 10;
-}
-
-.save-hint-ring {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: 3px solid rgba(255,255,255,0.7);
-  position: relative;
-}
-.save-hint-ring::after {
-  content: '';
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  border: 3px solid rgba(255,255,255,0.35);
-  animation: pulse-ring 1.6s ease-in-out infinite;
-}
-.save-hint-finger {
-  font-size: 36px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
-}
-
-.save-hint-text {
-  background: rgba(0,0,0,0.65);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-radius: 14px;
-  padding: 8px 16px;
-  text-align: center;
-}
-.save-hint-text strong {
-  display: block;
-  font-size: 15px;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 2px;
-}
-.save-hint-text span {
-  font-size: 12px;
-  color: rgba(255,255,255,0.6);
-}
-
-/* Bottom bar */
-#save-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px calc(var(--safe-bottom) + 14px);
-  background: var(--surface);
-  border-top: 0.5px solid rgba(255,255,255,0.1);
-  flex-shrink: 0;
-  gap: 12px;
-}
-
-#save-back-btn {
-  background: rgba(255,255,255,0.12);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: 12px 20px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.1s;
-}
-#save-back-btn:active { opacity: 0.65; }
-
-#save-share-btn {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: 12px 20px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.1s;
-  flex: 1;
-}
-#save-share-btn:active { opacity: 0.65; }
-
-/* ══════════════════════════════════════════
-   TOAST NOTIFICATIONS
-══════════════════════════════════════════ */
-
-#toast {
-  position: fixed;
-  top: calc(var(--safe-top) + 58px);
-  left: 50%;
-  transform: translateX(-50%) translateY(-8px);
-  background: rgba(30,30,32,0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 20px;
-  padding: 8px 18px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #fff;
-  white-space: nowrap;
-  z-index: 100;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.18s, transform 0.18s;
-}
-#toast.visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
+/* grain */
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.028'/%3E%3C/svg%3E");background-size:200px 200px;opacity:.5;}
 </style>
 </head>
 <body>
 
-<!-- ══════ START ══════ -->
-<div id="screen-start" class="screen active">
-  <div class="app-icon">
-    <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
-      <circle cx="25" cy="20" r="9" stroke="#FFD60A" stroke-width="2"/>
-      <circle cx="25" cy="20" r="4"  fill="#FFD60A" opacity="0.4"/>
-      <path d="M8 43c0-9.94 8.06-18 17-18s17 8.06 17 18" stroke="white" stroke-width="2" stroke-linecap="round"/>
-    </svg>
+<!-- ─── PIN ─── -->
+<div id="pin-screen">
+  <div class="pin-logo">JH<small>✦ Erinnerungen ✦</small></div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
   </div>
-  <div class="app-title">Timelapse Overlay</div>
-  <div class="app-subtitle">Überlagere die Kamera mit einem Referenzfoto für konsistente Aufnahmen.</div>
-  <button class="btn btn-primary" id="btn-start">Kamera starten</button>
+  <div class="pin-grid">
+    <button class="pin-btn" onclick="pinPress(1)">1</button>
+    <button class="pin-btn" onclick="pinPress(2)">2</button>
+    <button class="pin-btn" onclick="pinPress(3)">3</button>
+    <button class="pin-btn" onclick="pinPress(4)">4</button>
+    <button class="pin-btn" onclick="pinPress(5)">5</button>
+    <button class="pin-btn" onclick="pinPress(6)">6</button>
+    <button class="pin-btn" onclick="pinPress(7)">7</button>
+    <button class="pin-btn" onclick="pinPress(8)">8</button>
+    <button class="pin-btn" onclick="pinPress(9)">9</button>
+    <button class="pin-btn del" onclick="pinDel()">⌫</button>
+    <button class="pin-btn" onclick="pinPress(0)">0</button>
+    <button class="pin-btn del" onclick="pinClear()">✕</button>
+  </div>
+  <div class="pin-error" id="pin-error"></div>
+  <!-- 🔒 FIX #6 — Lockout banner -->
+  <div id="lockout-banner">
+    🔒 Gesperrt für <span id="lockout-countdown"></span> Sekunden
+  </div>
 </div>
 
-<!-- ══════ PERMISSION ERROR ══════ -->
-<div id="screen-permission" class="screen">
-  <div class="perm-icon">📷</div>
-  <h2>Kamerazugriff benötigt</h2>
-  <p>Bitte erlaube den Kamerazugriff in den iPhone-Einstellungen und versuche es erneut.</p>
-  <button class="btn btn-primary" id="btn-retry" style="margin-top:24px; max-width:240px">
-    Erneut versuchen
+<!-- ─── APP ─── -->
+<div id="app" style="display:none;">
+  <header>
+    <div class="app-title">JH<small>Erinnerungen</small></div>
+    <div class="hdr-r">
+      <span id="photo-count">0 Fotos</span>
+      <button class="icon-btn" onclick="scrollToEnd()">›</button>
+      <button class="icon-btn" onclick="scrollToStart()" style="font-size:.8rem;">‹</button>
+    </div>
+  </header>
+  <div id="timeline-wrapper">
+    <div class="timeline-axis" id="tl-axis"></div>
+    <div id="timeline"></div>
+    <div id="empty-state">
+      <div class="empty-icon">🌸</div>
+      <div class="empty-text">Noch keine Erinnerungen</div>
+    </div>
+    <div id="month-indicator"></div>
+  </div>
+  <div id="zoom-badge"></div>
+</div>
+
+<button id="fab" style="display:none;" onclick="togglePanel()">+</button>
+
+<!-- ─── UPLOAD PANEL ─── -->
+<div id="upload-panel">
+  <div class="panel-title">✦ Moment hinzufügen</div>
+  <div class="form-group">
+    <span class="form-lbl">Foto wählen</span>
+    <div class="file-row">
+      <!-- 🔒 FIX #8 — accept only specific image types -->
+      <label class="file-btn">
+        <input type="file" id="file-gallery" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onchange="onFileChange(event)">
+        <span class="file-btn-icon">🖼️</span><span>Galerie</span>
+      </label>
+      <label class="file-btn">
+        <input type="file" id="file-camera" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onchange="onFileChange(event)">
+        <span class="file-btn-icon">📷</span><span>Kamera</span>
+      </label>
+      <img id="preview-thumb" alt="">
+    </div>
+    <div class="file-error" id="file-error"></div>
+  </div>
+  <div class="form-group">
+    <label class="form-lbl" for="date-input">Datum</label>
+    <input type="date" id="date-input" class="form-input">
+  </div>
+  <div class="form-group">
+    <label class="form-lbl" for="text-input">Beschreibung</label>
+    <!-- 🔒 FIX: maxlength prevents excessively long input -->
+    <input type="text" id="text-input" class="form-input" placeholder="Was war das für ein Moment?" maxlength="300">
+  </div>
+  <button class="save-btn" id="save-btn" onclick="uploadMoment()">
+    <span id="save-lbl">💾 Speichern</span>
   </button>
-  <button class="btn btn-secondary" id="btn-perm-back" style="max-width:240px">
-    Zurück
-  </button>
+  <div class="prog-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+  <div class="status-msg" id="status-msg"></div>
 </div>
 
-<!-- ══════ CAMERA ══════ -->
-<div id="screen-camera" class="screen">
-
-  <!-- Video stream -->
-  <video id="video" autoplay playsinline muted></video>
-
-  <!-- Reference image overlay -->
-  <img id="overlay-img" alt="">
-
-  <!-- Shutter flash -->
-  <div id="flash"></div>
-
-  <!-- Top bar -->
-  <div id="top-bar">
-    <button class="icon-btn" id="btn-close-camera" aria-label="Schließen">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path d="M2 2l12 12M14 2L2 14" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
-      </svg>
-    </button>
-
-    <div id="opacity-badge" style="visibility:hidden">50%</div>
-
-    <!-- Spacer for symmetry -->
-    <div style="width:40px"></div>
-  </div>
-
-  <!-- Hint: shown when no overlay loaded -->
-  <div id="no-overlay-hint">
-    <p>Referenzbild laden →</p>
-  </div>
-
-  <!-- Bottom controls -->
-  <div id="bottom-controls">
-
-    <!-- Opacity slider — only visible when overlay is active -->
-    <div id="slider-row">
-      <svg class="slider-icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <circle cx="9" cy="9" r="4" stroke="white" stroke-width="1.5"/>
-      </svg>
-      <input type="range" id="opacity-slider" min="0" max="100" value="50"
-             aria-label="Transparenz des Referenzbildes">
-      <svg class="slider-icon" width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <circle cx="9" cy="9" r="7" stroke="white" stroke-width="1.5"/>
-        <circle cx="9" cy="9" r="3" fill="white"/>
-      </svg>
+<!-- ─── DELETE CONFIRM ─── -->
+<div id="delete-confirm">
+  <div class="del-box">
+    <div class="del-icon">🗑️</div>
+    <h3>Moment löschen?</h3>
+    <p>Dieses Foto wird dauerhaft entfernt.<br>Das kann nicht rückgängig gemacht werden.</p>
+    <div class="del-actions">
+      <button class="btn-cancel" onclick="cancelDelete()">Abbrechen</button>
+      <button class="btn-del-ok" id="btn-del-ok" onclick="confirmDelete()">Löschen</button>
     </div>
-
-    <!-- Main buttons -->
-    <div id="shutter-row">
-
-      <!-- Last captured photo thumbnail -->
-      <button id="last-photo-btn" aria-label="Letztes Foto">
-        <img id="last-photo-img" alt="Letztes Foto">
-        <span id="last-photo-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <rect x="2" y="6" width="15" height="12" rx="2" stroke="white" stroke-width="1.5"/>
-            <path d="M19 9.5l3-2v9l-3-2v-5z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-          </svg>
-        </span>
-      </button>
-
-      <!-- Shutter -->
-      <button id="shutter-btn" aria-label="Foto aufnehmen">
-        <div class="shutter-ring">
-          <div class="shutter-fill"></div>
-        </div>
-      </button>
-
-      <!-- Load reference image -->
-      <button id="load-ref-btn" aria-label="Referenzbild laden">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="3" width="18" height="18" rx="2.5" stroke="white" stroke-width="1.5"/>
-          <path d="M12 15V9M9 12l3-3 3 3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M8 18h8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-
-    </div>
-  </div>
-
-  <!-- File inputs -->
-  <input type="file" id="ref-input" accept="image/*">
-  <canvas id="canvas"></canvas>
-
-</div>
-
-<!-- ══════ SAVE FALLBACK ══════ -->
-<!--
-  Shown when navigator.share({files}) is unavailable (file:// protocol).
-  The <img> element gets iOS native long-press menu with "Bild sichern".
-  -webkit-touch-callout:default and touch-action:auto are required on the img.
--->
-<div id="screen-save" class="screen">
-  <img id="save-preview-img" alt="Aufnahme">
-
-  <!-- Animated hint (pointer-events:none so touches reach the image below) -->
-  <div id="save-hint-overlay">
-    <div class="save-hint-ring">
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
-        <span class="save-hint-finger">👆</span>
-      </div>
-    </div>
-    <div class="save-hint-text">
-      <strong>Gedrückt halten</strong>
-      <span>→ "Bild sichern" wählen</span>
-    </div>
-  </div>
-
-  <div id="save-bar">
-    <button id="save-back-btn">← Zurück</button>
-    <button id="save-share-btn">📤 Teilen</button>
   </div>
 </div>
 
-<!-- Toast -->
-<div id="toast" role="status" aria-live="polite"></div>
+<!-- ─── LIGHTBOX ─── -->
+<div id="lightbox">
+  <div id="lb-topbar">
+    <button id="lb-back" onclick="closeLightbox()">← Timeline</button>
+    <button id="lb-trash" onclick="askDelete()">🗑️</button>
+  </div>
+  <div id="lb-swipe-hint">← wischen zum Blättern →</div>
+  <div id="lb-img-wrap">
+    <button class="lb-arr" id="lb-prev" onclick="lbNav(-1)">‹</button>
+    <img id="lb-img" src="" alt="">
+    <button class="lb-arr" id="lb-next" onclick="lbNav(1)">›</button>
+  </div>
+  <div id="lb-info">
+    <div id="lb-date"></div>
+    <div id="lb-cap"></div>
+    <div id="lb-ctr"></div>
+    <div id="lb-dots"></div>
+  </div>
+</div>
 
-<script>
-'use strict';
+<!-- ─── FIREBASE ─── -->
+<script type="module">
+import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc,
+         onSnapshot, query, orderBy, serverTimestamp, Timestamp }
+                           from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* ══════════════════════════════════════════
-   MODULE: UI HELPERS
-══════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════
+   🔒 SECURITY CONFIG
+   ────────────────────────────────────────────────────────
+   PIN_HASH = SHA-256("1234")
+   → Zum Ändern: neuen PIN hashen mit:
+     https://emn178.github.io/online-tools/sha256.html
+   → Dann diesen String ersetzen.
 
-const UI = (() => {
-  const $ = id => document.getElementById(id);
-  let toastTimer = null;
+   Firebase API-Key: In Google Cloud Console einschränken auf:
+   → HTTP-Referrer: https://DEIN-GITHUB-USERNAME.github.io/*
 
-  function showScreen(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    $(id).classList.add('active');
+   Cloudinary: Upload Preset "timeline" einschränken auf:
+   → Allowed formats: jpg,png,webp,heic
+   → Max file size: 15 MB
+   → Folder: timeline/
+════════════════════════════════════════════════════════ */
+const PIN_HASH = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
+// ↑ SHA-256 von "1234" — BITTE VOR PRODUKTIVEINSATZ ÄNDERN
+
+const CLOUDINARY_HOST = "res.cloudinary.com"; // 🔒 FIX #5 erlaubte Bild-Domain
+const CL_URL          = "https://api.cloudinary.com/v1_1/db98q2eok/image/upload";
+const CL_PRESET       = "timeline";
+
+/* 🔒 FIX #8 — Erlaubte Dateitypen + Max-Größe */
+const ALLOWED_TYPES = ["image/jpeg","image/png","image/webp","image/heic","image/heif"];
+const MAX_FILE_MB   = 20;
+
+const fbCfg = {
+  apiKey:"AIzaSyAc3oaP6Dp0DUaum3e7YNLtO6lSzuXXtro",
+  authDomain:"hansjoergultimeline.firebaseapp.com",
+  projectId:"hansjoergultimeline",
+  storageBucket:"hansjoergultimeline.firebasestorage.app",
+  messagingSenderId:"616046735856",
+  appId:"1:616046735856:web:c8e68d41725d6a41212d35"
+};
+
+const fbApp = initializeApp(fbCfg);
+const db    = getFirestore(fbApp);
+
+/* ─── APP STATE ─── */
+let moments       = [];
+let cardSize      = 200;
+let visualScale   = 1;
+const MIN = 70, MAX = 360;
+let selectedFile  = null;
+let lbIdx         = 0;
+let deleteId      = null;
+let badgeTimer    = null;
+let monthTimer    = null;
+let pinchStartSize= 200;
+let pinchStartDist= 0;
+let isPinching    = false;
+let isFirstUpload = false;
+
+/* ════════════════════════════════════════════════════════
+   🔒 FIX #1 + #6 — PIN: SHA-256 Hash + Brute-Force-Schutz
+════════════════════════════════════════════════════════ */
+let pinBuf       = "";
+let failCount    = 0;
+const MAX_FAILS  = 5;      // Versuche bevor Sperre
+const LOCK_MS    = 30000;  // 30 Sekunden Sperre
+let lockedUntil  = 0;
+let lockInterval = null;
+
+window.pinPress = n => {
+  /* Gesperrt? */
+  if(Date.now() < lockedUntil) return;
+  if(pinBuf.length < 4){
+    pinBuf += String(n);
+    updDots();
+    if(pinBuf.length === 4) checkPin();
   }
+};
+window.pinDel   = ()=>{ if(Date.now()<lockedUntil)return; pinBuf=pinBuf.slice(0,-1); updDots(); };
+window.pinClear = ()=>{ if(Date.now()<lockedUntil)return; pinBuf=""; updDots(); };
 
-  function showToast(message, duration = 2200) {
-    const el = $('toast');
-    el.textContent = message;
-    el.classList.add('visible');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('visible'), duration);
-  }
+function updDots(){
+  for(let i=0;i<4;i++) $("d"+i).classList.toggle("filled", i < pinBuf.length);
+}
 
-  // Prevent pull-to-refresh and rubber-banding.
-  // Exceptions: range inputs (sliders) need touchmove to work.
-  function lockScroll() {
-    document.addEventListener('touchmove', e => {
-      // Allow touchmove on range inputs so the slider can be dragged
-      if (e.target.closest('input[type="range"]')) return;
-      e.preventDefault();
-    }, { passive: false });
-  }
+/* SHA-256 via Web Crypto API (built-in, no library needed) */
+async function sha256(str){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
 
-  function dataUrlToBlob(dataUrl) {
-    const [header, data] = dataUrl.split(',');
-    const mime   = header.match(/:(.*?);/)[1];
-    const bytes  = atob(data);
-    const buffer = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) buffer[i] = bytes.charCodeAt(i);
-    return new Blob([buffer], { type: mime });
-  }
+async function checkPin(){
+  const hash = await sha256(pinBuf);
+  if(hash === PIN_HASH){
+    /* ✓ Correct — reset counters and open app */
+    failCount = 0; lockedUntil = 0;
+    clearInterval(lockInterval);
+    $("pin-screen").style.display = "none";
+    const a = $("app"); a.style.display = "flex";
+    requestAnimationFrame(()=>a.classList.add("ready"));
+    $("fab").style.display = "flex";
+    initApp();
+  } else {
+    /* ✗ Wrong PIN */
+    failCount++;
+    pinBuf = ""; updDots();
+    const errEl = $("pin-error");
 
-  return { $, showScreen, showToast, lockScroll, dataUrlToBlob };
-})();
-
-/* ══════════════════════════════════════════
-   MODULE: CAMERA
-   Responsibility: manage MediaStream lifecycle
-══════════════════════════════════════════ */
-
-const Camera = (() => {
-  const { $, showScreen, showToast } = UI;
-  let stream = null;
-
-  async function start() {
-    // Always stop previous stream first
-    stop();
-
-    // Minimal constraints: let iOS pick the best config.
-    // Width/height ideals often cause black frames on iOS.
-    const constraints = {
-      video: { facingMode: { ideal: 'environment' } },
-      audio: false
-    };
-
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-      const video = $('video');
-      video.srcObject = stream;
-      // Explicit play() required by iOS Safari after srcObject assignment
-      await video.play();
-      showScreen('screen-camera');
-    } catch (err) {
-      console.error('[Camera] start failed:', err.name, err.message);
-      showScreen('screen-permission');
+    if(failCount >= MAX_FAILS){
+      /* Lock */
+      lockedUntil = Date.now() + LOCK_MS;
+      failCount   = 0;
+      errEl.textContent = "";
+      errEl.classList.remove("show");
+      startLockdown();
+    } else {
+      const left = MAX_FAILS - failCount;
+      errEl.textContent = `Falscher PIN. Noch ${left} Versuch${left!==1?"e":""}.`;
+      errEl.classList.add("show","pin-shake");
+      setTimeout(()=>errEl.classList.remove("show","pin-shake"), 1600);
     }
   }
+}
 
-  function stop() {
-    if (!stream) return;
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-    const video = $('video');
-    video.srcObject = null;
-  }
+function startLockdown(){
+  const banner   = $("lockout-banner");
+  const cntEl    = $("lockout-countdown");
+  banner.classList.add("show");
+  /* Disable all pin buttons */
+  document.querySelectorAll(".pin-btn").forEach(b=>b.disabled=true);
 
-  function isActive() {
-    return stream !== null;
-  }
-
-  // Restart on visibility restore (app comes back from background)
-  document.addEventListener('visibilitychange', () => {
-    const camActive = document.getElementById('screen-camera').classList.contains('active');
-    if (!document.hidden && camActive) {
-      const video = $('video');
-      if (!stream) {
-        start();
-      } else if (video.paused) {
-        video.play().catch(() => {});
-      }
+  function tick(){
+    const left = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
+    cntEl.textContent = left;
+    if(left <= 0){
+      clearInterval(lockInterval);
+      banner.classList.remove("show");
+      document.querySelectorAll(".pin-btn").forEach(b=>b.disabled=false);
     }
+  }
+  tick();
+  lockInterval = setInterval(tick, 500);
+}
+
+/* ════════════════════════════════════════════════════════
+   🔒 FIX #5 — URL-Validierung (verhindert XSS via Firestore)
+════════════════════════════════════════════════════════ */
+function safeImageUrl(url){
+  try {
+    const u = new URL(url);
+    if(u.protocol !== "https:") return "";
+    if(!u.hostname.endsWith(CLOUDINARY_HOST)) return "";
+    // Keine javascript: oder data: URIs möglich
+    return url;
+  } catch { return ""; }
+}
+
+/* ════════════════════════════════════════════════════════
+   🔒 FIX #8 — Datei-Validierung (Typ + Größe)
+════════════════════════════════════════════════════════ */
+function validateFile(file){
+  const errEl = $("file-error");
+  if(!ALLOWED_TYPES.includes(file.type)){
+    errEl.textContent = "❌ Nur JPG, PNG, WebP oder HEIC erlaubt.";
+    errEl.classList.add("show");
+    return false;
+  }
+  if(file.size > MAX_FILE_MB * 1024 * 1024){
+    errEl.textContent = `❌ Datei zu groß (max. ${MAX_FILE_MB} MB).`;
+    errEl.classList.add("show");
+    return false;
+  }
+  errEl.classList.remove("show");
+  return true;
+}
+
+/* ════════════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════════════ */
+function initApp(){
+  $("date-input").valueAsDate = new Date();
+  positionAxis();
+  window.addEventListener("resize",()=>{ positionAxis(); renderTimeline(); });
+
+  const q = query(collection(db,"momente"), orderBy("eventDate","asc"));
+  onSnapshot(q, snap => {
+    const prev = moments.length;
+    moments = [];
+    snap.forEach(d => moments.push({id:d.id, ...d.data()}));
+    $("photo-count").textContent = `${moments.length} Foto${moments.length!==1?"s":""}`;
+    $("empty-state").style.display = moments.length===0 ? "flex" : "none";
+    renderTimeline();
+    if(isFirstUpload && moments.length > prev){ launchConfetti(); isFirstUpload=false; }
   });
 
-  // Guard against stalled video (rare on iOS)
-  document.getElementById('video').addEventListener('stalled', () => {
-    const video = $('video');
-    if (stream) {
-      video.srcObject = stream;
-      video.play().catch(() => {});
+  $("timeline").addEventListener("scroll", onTimelineScroll, {passive:true});
+}
+
+function axisY(){ return $("timeline-wrapper").clientHeight * 0.38; }
+function positionAxis(){ $("tl-axis").style.top = axisY()+"px"; }
+
+/* ════════════════════════════════════════════════════════
+   RENDER TIMELINE
+════════════════════════════════════════════════════════ */
+function renderTimeline(){
+  const tl   = $("timeline");
+  const ay   = axisY();
+  const sz   = cardSize;
+
+  const photoH    = sz * 1.28;
+  const dateH     = sz < 120 ? 16 : 22;
+  const connTop   = sz < 110 ?  4 : 11;
+  const dotSz     = sz < 110 ?  6 :  9;
+  const connBot   = sz < 110 ?  3 :  7;
+  const abovePhoto= dateH + connTop + dotSz + connBot;
+  const cardTop   = ay - abovePhoto;
+  const dateFs    = Math.max(.48, Math.min(.66, sz/295));
+  const capShow   = sz > 115;
+  const yearShow  = sz > 130;
+  const r         = sz < 110 ? "7px" : "13px";
+
+  let gap;
+  if(sz < 90)       gap = -sz * 0.45;
+  else if(sz < 120) gap = -sz * 0.28;
+  else if(sz < 160) gap = -sz * 0.08;
+  else              gap = Math.max(8, sz * 0.06);
+
+  const scrollRatio = tl.scrollWidth > 0 ? tl.scrollLeft / tl.scrollWidth : 0;
+  tl.innerHTML = "";
+  let lastYear = null;
+
+  moments.forEach((m, idx) => {
+    const d  = toDate(m.eventDate);
+    const yr = d.getFullYear();
+
+    if(yearShow && yr !== lastYear){
+      if(idx > 0){
+        const sep  = document.createElement("div");
+        sep.className = "year-sep";
+        sep.style.cssText = `margin-top:${cardTop}px;margin-left:${gap<0?Math.abs(gap)*0.3:6}px;margin-right:${gap<0?Math.abs(gap)*0.3:6}px;`;
+        const pill = document.createElement("div");
+        pill.className = "year-pill";
+        pill.style.cssText = `margin-top:${abovePhoto*0.35}px;font-size:${Math.min(.95,sz/220)}rem;`;
+        pill.textContent = yr;
+        sep.appendChild(pill);
+        tl.appendChild(sep);
+      }
+      lastYear = yr;
     }
+
+    /* 🔒 FIX #5 — Validate URL before rendering */
+    const safeUrl = safeImageUrl(m.imageUrl);
+    if(!safeUrl) return; // skip invalid/suspicious entries
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.dataset.idx = idx;
+    card.style.cssText = `width:${sz}px;margin-top:${cardTop}px;margin-left:${idx>0?gap:0}px;`;
+
+    /* Build card with textContent / createElement (no innerHTML with user data for safety) */
+    const datePill = document.createElement("div");
+    datePill.className = "card-date";
+    datePill.style.cssText = `font-size:${dateFs}rem;padding:${sz<120?"2px 6px":"3px 10px"};`;
+    datePill.textContent = fmtDate(d, sz);  // textContent = safe
+
+    const conn1 = document.createElement("div");
+    conn1.className = "card-conn"; conn1.style.height = connTop+"px";
+
+    const dot = document.createElement("div");
+    dot.className = "card-dot";
+    dot.style.cssText = `width:${dotSz}px;height:${dotSz}px;box-shadow:0 0 0 ${sz<110?1.5:2}px var(--accent2);`;
+
+    const conn2 = document.createElement("div");
+    conn2.className = "card-conn"; conn2.style.height = connBot+"px";
+
+    const media = document.createElement("div");
+    media.className = "card-media";
+    media.style.cssText = `height:${photoH}px;border-radius:${r};`;
+
+    const img = document.createElement("img");
+    img.src     = safeUrl;           // 🔒 validated URL only
+    img.alt     = m.text || "";      // textContent equivalent
+    img.loading = "lazy";
+    img.className = "loading";
+    img.addEventListener("load", ()=>{ img.classList.add("loaded"); img.classList.remove("loading"); });
+    media.appendChild(img);
+
+    card.appendChild(datePill);
+    card.appendChild(conn1);
+    card.appendChild(dot);
+    card.appendChild(conn2);
+    card.appendChild(media);
+
+    if(capShow && m.text){
+      const cap = document.createElement("div");
+      cap.className = "card-caption";
+      cap.textContent = m.text;  // 🔒 textContent = no XSS possible
+      card.appendChild(cap);
+    }
+
+    card.addEventListener("click", e => { addRipple(card,e); openLightbox(idx); });
+    tl.appendChild(card);
   });
 
-  return { start, stop, isActive };
-})();
+  if(scrollRatio > 0) tl.scrollLeft = tl.scrollWidth * scrollRatio;
+  observeCards();
+}
 
-/* ══════════════════════════════════════════
-   MODULE: OVERLAY
-   Responsibility: load and display reference image
-══════════════════════════════════════════ */
+function observeCards(){
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add("visible"); io.unobserve(e.target); } });
+  }, {threshold:.1});
+  document.querySelectorAll(".card").forEach(c => io.observe(c));
+}
 
-const Overlay = (() => {
-  const { $, showToast } = UI;
-  const MAX_DIMENSION = 4096; // Resize above this to avoid iOS memory pressure
-  let loaded = false;
+function addRipple(card, e){
+  const r = document.createElement("div");
+  r.className = "card-ripple";
+  const rect = card.getBoundingClientRect();
+  r.style.cssText = `width:40px;height:40px;left:${e.clientX-rect.left-20}px;top:${e.clientY-rect.top-20}px;`;
+  card.appendChild(r);
+  r.addEventListener("animationend", ()=>r.remove());
+}
 
-  function load(file) {
-    if (!file) return;
+function toDate(v){ return v?.toDate ? v.toDate() : new Date(v); }
+function fmtDate(d, sz){
+  if(sz >= 185) return d.toLocaleDateString("de-DE",{day:"2-digit",month:"short",year:"2-digit"});
+  if(sz >= 120) return d.toLocaleDateString("de-DE",{month:"short",year:"2-digit"});
+  return String(d.getFullYear()).slice(2)+"'";
+}
 
-    const reader = new FileReader();
-    reader.onerror = () => showToast('Fehler beim Laden des Bildes');
-    reader.onload = e => {
-      const img = new Image();
-      img.onerror = () => showToast('Ungültiges Bildformat');
-      img.onload = () => {
-        const src = _maybeResize(img, e.target.result);
-        _apply(src);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+/* ════════════════════════════════════════════════════════
+   SMOOTH PINCH-TO-ZOOM (GPU-accelerated during gesture)
+════════════════════════════════════════════════════════ */
+const wrapper = $("timeline-wrapper");
+const tlEl    = $("timeline");
+
+wrapper.addEventListener("touchstart", e => {
+  if(e.touches.length === 2){
+    e.preventDefault();
+    isPinching      = true;
+    pinchStartDist  = tdist(e.touches[0], e.touches[1]);
+    pinchStartSize  = cardSize;
+    visualScale     = 1;
+    tlEl.style.transition     = "none";
+    tlEl.style.transformOrigin= "center center";
   }
+},{passive:false});
 
-  function _maybeResize(img, originalSrc) {
-    if (img.width <= MAX_DIMENSION && img.height <= MAX_DIMENSION) {
-      return originalSrc;
-    }
-    const scale = Math.min(MAX_DIMENSION / img.width, MAX_DIMENSION / img.height);
-    const cv = document.createElement('canvas');
-    cv.width  = Math.round(img.width  * scale);
-    cv.height = Math.round(img.height * scale);
-    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-    return cv.toDataURL('image/jpeg', 0.9);
+wrapper.addEventListener("touchmove", e => {
+  if(isPinching && e.touches.length === 2){
+    e.preventDefault();
+    const d2       = tdist(e.touches[0], e.touches[1]);
+    const rawScale = d2 / pinchStartDist;
+    const newSize  = clamp(pinchStartSize * rawScale, MIN, MAX);
+    visualScale    = newSize / pinchStartSize;
+    tlEl.style.transform = `scaleX(${visualScale})`;
+    showBadge(newSize);
   }
+},{passive:false});
 
-  function _apply(src) {
-    const el = $('overlay-img');
-    el.src = src;
-    el.style.display = 'block';
-    loaded = true;
-
-    // Show opacity slider and badge
-    $('slider-row').style.display = 'flex';
-    $('opacity-badge').style.visibility = 'visible';
-    $('no-overlay-hint').style.display = 'none';
-
-    showToast('✓ Referenzbild geladen');
+wrapper.addEventListener("touchend", e => {
+  if(e.touches.length < 2 && isPinching){
+    isPinching = false;
+    cardSize   = clamp(pinchStartSize * visualScale, MIN, MAX);
+    tlEl.style.transform  = "";
+    tlEl.style.transition = "";
+    renderTimeline();
   }
+},{passive:true});
 
-  function setOpacity(value) {
-    $('overlay-img').style.opacity = value / 100;
-    $('opacity-badge').textContent  = `${value}%`;
+function tdist(a,b){ return Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY); }
+function clamp(v,lo,hi){ return Math.min(hi, Math.max(lo, v)); }
+
+function showBadge(sz){
+  const b = $("zoom-badge");
+  const pct = Math.round((sz-MIN)/(MAX-MIN)*100);
+  b.textContent = `${pct}%`;
+  b.classList.add("show");
+  clearTimeout(badgeTimer);
+  badgeTimer = setTimeout(()=>b.classList.remove("show"), 1600);
+}
+
+/* ─── Month indicator ─── */
+function onTimelineScroll(){
+  if(!moments.length) return;
+  const tl  = $("timeline");
+  const mid = tl.scrollLeft + tl.clientWidth/2;
+  const idx = Math.min(moments.length-1, Math.floor((mid/tl.scrollWidth)*moments.length));
+  const m   = moments[idx];
+  if(!m) return;
+  const label = toDate(m.eventDate).toLocaleDateString("de-DE",{month:"long",year:"numeric"});
+  const mi = $("month-indicator");
+  mi.textContent = label;  // 🔒 textContent
+  mi.classList.add("show");
+  clearTimeout(monthTimer);
+  monthTimer = setTimeout(()=>mi.classList.remove("show"), 1500);
+}
+
+/* ════════════════════════════════════════════════════════
+   LIGHTBOX
+════════════════════════════════════════════════════════ */
+window.openLightbox = idx => { lbIdx=idx; fillLb(); $("lightbox").classList.add("open"); };
+window.closeLightbox= ()  => $("lightbox").classList.remove("open");
+
+window.lbNav = dir => {
+  const img = $("lb-img");
+  img.classList.add(dir<0 ? "out-r" : "out-l");
+  setTimeout(()=>{ lbIdx=(lbIdx+dir+moments.length)%moments.length; fillLb(); }, 210);
+};
+
+function fillLb(){
+  const m = moments[lbIdx];
+  if(!m) return;
+  const safeUrl = safeImageUrl(m.imageUrl);  // 🔒 validate
+  $("lb-img").classList.remove("out-l","out-r");
+  $("lb-img").src = safeUrl;
+  const d = toDate(m.eventDate);
+  $("lb-date").textContent = d.toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  $("lb-cap").textContent  = m.text || "";   // 🔒 textContent
+  $("lb-ctr").textContent  = `${lbIdx+1} von ${moments.length}`;
+  const dots = $("lb-dots"); dots.innerHTML="";
+  const t=moments.length, s=Math.max(0,lbIdx-3), e2=Math.min(t-1,lbIdx+3);
+  for(let i=s;i<=e2;i++){
+    const d2=document.createElement("div");
+    d2.className="lb-d"+(i===lbIdx?" on":"");
+    dots.appendChild(d2);
   }
+  const multi = t>1;
+  $("lb-prev").style.display = multi?"flex":"none";
+  $("lb-next").style.display = multi?"flex":"none";
+}
 
-  function isLoaded() { return loaded; }
+let lbTX=null, lbTY=null;
+$("lb-img-wrap").addEventListener("touchstart",e=>{lbTX=e.touches[0].clientX;lbTY=e.touches[0].clientY;},{passive:true});
+$("lb-img-wrap").addEventListener("touchend",e=>{
+  if(lbTX===null)return;
+  const dx=e.changedTouches[0].clientX-lbTX;
+  const dy=e.changedTouches[0].clientY-lbTY;
+  lbTX=lbTY=null;
+  if(Math.abs(dy)>Math.abs(dx)&&dy>55){closeLightbox();return;}
+  if(Math.abs(dx)>45) lbNav(dx<0?1:-1);
+},{passive:true});
 
-  return { load, setOpacity, isLoaded };
-})();
-
-/* ══════════════════════════════════════════
-   MODULE: CAPTURE
-   Responsibility: take photo, save to Photos
-
-   iOS Save Strategy:
-   1. navigator.share({files}) called WITHIN the shutter
-      click handler (same user gesture = share sheet opens
-      immediately, no second tap required).
-   2. If share API is unavailable (non-HTTPS, older iOS):
-      show fallback screen where user long-presses to save.
-
-   Canvas crop logic:
-   The video element uses object-fit:cover, which scales the
-   stream to fill the element and crops the excess. To capture
-   exactly what is visible (not the full uncropped stream), we
-   calculate the same crop and apply it via drawImage src params.
-══════════════════════════════════════════ */
-
-const Capture = (() => {
-  const { $, showScreen, showToast, dataUrlToBlob } = UI;
-  let lastDataUrl  = null;
-  let lastFilename = null;
-
-  // Called directly from shutter button click (user gesture required for share)
-  async function shoot() {
-    const video = $('video');
-
-    if (!video.videoWidth || !video.videoHeight) {
-      showToast('Kamera noch nicht bereit – bitte kurz warten');
-      return;
-    }
-
-    const dataUrl  = _captureFrame(video);
-    const filename = _generateFilename();
-
-    lastDataUrl  = dataUrl;
-    lastFilename = filename;
-
-    _triggerFlash();
-    _updateThumbnail(dataUrl);
-
-    // Attempt to save. Must be called here (same gesture stack as shutter tap).
-    await _save(dataUrl, filename);
+/* ════════════════════════════════════════════════════════
+   DELETE
+════════════════════════════════════════════════════════ */
+window.askDelete = ()=>{ const m=moments[lbIdx]; if(!m)return; deleteId=m.id; $("delete-confirm").classList.add("show"); };
+window.cancelDelete = ()=>{ deleteId=null; $("delete-confirm").classList.remove("show"); };
+window.confirmDelete= async()=>{
+  if(!deleteId) return;
+  const btn=$("btn-del-ok"); btn.textContent="…"; btn.disabled=true;
+  try{
+    await deleteDoc(doc(db,"momente",deleteId));
+    $("delete-confirm").classList.remove("show");
+    closeLightbox();
+    deleteId=null;
+    btn.textContent="Löschen"; btn.disabled=false;
+  }catch(err){
+    console.error(err);
+    btn.textContent="Fehler!";
+    setTimeout(()=>{btn.textContent="Löschen";btn.disabled=false;},2000);
   }
+};
 
-  // Re-share the last captured photo (thumbnail tap)
-  async function reshareLastPhoto() {
-    if (!lastDataUrl) {
-      showToast('Noch kein Foto aufgenommen');
-      return;
-    }
-    await _save(lastDataUrl, lastFilename);
+/* ════════════════════════════════════════════════════════
+   UPLOAD
+════════════════════════════════════════════════════════ */
+window.onFileChange = e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  /* 🔒 FIX #8 — Validate immediately on selection */
+  if(!validateFile(file)){
+    selectedFile = null;
+    e.target.value = "";
+    $("preview-thumb").style.display = "none";
+    return;
   }
+  selectedFile = file;
+  const th = $("preview-thumb");
+  th.src = URL.createObjectURL(file);
+  th.style.display = "block";
+};
 
-  // ── Private ─────────────────────────────
+window.uploadMoment = async () => {
+  if(!selectedFile){ setStatus("Bitte ein Foto wählen."); return; }
+  /* 🔒 Re-validate before upload (defense in depth) */
+  if(!validateFile(selectedFile)){ return; }
 
-  function _captureFrame(video) {
-    const canvas = $('canvas');
+  const dv   = $("date-input").value;
+  if(!dv){ setStatus("Datum fehlt."); return; }
 
-    // Screen dimensions (what is actually visible)
-    const screenW = video.offsetWidth;
-    const screenH = video.offsetHeight;
+  /* 🔒 Sanitize text input */
+  const text = $("text-input").value.trim().slice(0, 300);
 
-    // Raw camera stream dimensions
-    const streamW = video.videoWidth;
-    const streamH = video.videoHeight;
+  const btn=$("save-btn"), lbl=$("save-lbl");
+  btn.disabled=true; lbl.textContent="Wird hochgeladen…";
+  setStatus("Foto wird hochgeladen…"); setProg(15);
 
-    // object-fit:cover scale factor: fills screen, crops excess
-    const coverScale = Math.max(screenW / streamW, screenH / streamH);
+  try{
+    const form = new FormData();
+    form.append("file", selectedFile);
+    form.append("upload_preset", CL_PRESET);
+    const res  = await fetch(CL_URL, {method:"POST", body:form});
+    if(!res.ok) throw new Error("Cloudinary "+res.status);
+    const json = await res.json();
 
-    // Rendered stream size after cover scale
-    const renderedW = streamW * coverScale;
-    const renderedH = streamH * coverScale;
+    /* 🔒 FIX #5 — Validate Cloudinary response URL before saving */
+    const imageUrl = safeImageUrl(json.secure_url);
+    if(!imageUrl) throw new Error("Ungültige Bild-URL von Cloudinary.");
 
-    // Pixel offset of the crop (centred)
-    const cropOffsetX = (renderedW - screenW) / 2;
-    const cropOffsetY = (renderedH - screenH) / 2;
+    setProg(72); setStatus("Wird gespeichert…");
+    const [y,mo,d] = dv.split("-").map(Number);
+    const eventDate= Timestamp.fromDate(new Date(y,mo-1,d));
+    if(moments.length===0) isFirstUpload=true;
 
-    // Source rectangle in original stream coordinates
-    const srcX = cropOffsetX / coverScale;
-    const srcY = cropOffsetY / coverScale;
-    const srcW = screenW    / coverScale;
-    const srcH = screenH    / coverScale;
-
-    // Output canvas = screen pixel size (1:1 with what user sees)
-    canvas.width  = screenW;
-    canvas.height = screenH;
-
-    canvas.getContext('2d').drawImage(video, srcX, srcY, srcW, srcH, 0, 0, screenW, screenH);
-
-    return canvas.toDataURL('image/jpeg', 0.95);
-  }
-
-  function _generateFilename() {
-    const now  = new Date();
-    const pad  = n => String(n).padStart(2, '0');
-    return `timelapse_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.jpg`;
-  }
-
-  function _triggerFlash() {
-    const flash = $('flash');
-    flash.style.opacity = 1;
-    setTimeout(() => { flash.style.opacity = 0; }, 80);
-  }
-
-  function _updateThumbnail(dataUrl) {
-    $('last-photo-img').src     = dataUrl;
-    $('last-photo-img').style.display  = 'block';
-    $('last-photo-icon').style.display = 'none';
-  }
-
-  async function _save(dataUrl, filename) {
-    // On file:// protocol, navigator.share({files}) is always blocked by iOS.
-    // Skip straight to the visual fallback to avoid a confusing error flash.
-    const isFileProtocol = location.protocol === 'file:';
-
-    if (!isFileProtocol && typeof navigator.share === 'function') {
-      try {
-        const blob = dataUrlToBlob(dataUrl);
-        const file = new File([blob], filename, { type: 'image/jpeg' });
-        await navigator.share({ files: [file], title: 'Timelapse Foto' });
-        // Share sheet opened — "In Fotos sichern" is one tap inside it.
-        return;
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          // User cancelled the share sheet — stay on camera, do nothing.
-          return;
-        }
-        // Other error (e.g. file sharing not supported on this browser):
-        // fall through to visual fallback below.
-        console.warn('[Capture] share failed:', err.name, err.message);
-      }
-    }
-
-    // Fallback: show photo fullscreen so user can long-press → "Bild sichern".
-    // This works on ALL iOS versions and protocols — it uses the native
-    // Safari image context menu, which always includes "Bild sichern".
-    $('save-preview-img').src = dataUrl;
-    showScreen('screen-save');
-  }
-
-  return { shoot, reshareLastPhoto, getLastDataUrl: () => lastDataUrl, getLastFilename: () => lastFilename };
-})();
-
-/* ══════════════════════════════════════════
-   MODULE: APP
-   Responsibility: wire events, bootstrap
-══════════════════════════════════════════ */
-
-const App = (() => {
-  const { $, showScreen, showToast, lockScroll, dataUrlToBlob } = UI;
-
-  function init() {
-    lockScroll();
-    _bindEvents();
-  }
-
-  function _bindEvents() {
-    // Start screen
-    $('btn-start').addEventListener('click', () => Camera.start());
-
-    // Permission screen
-    $('btn-retry').addEventListener('click',     () => Camera.start());
-    $('btn-perm-back').addEventListener('click', () => showScreen('screen-start'));
-
-    // Camera: close
-    $('btn-close-camera').addEventListener('click', () => {
-      Camera.stop();
-      showScreen('screen-start');
+    await addDoc(collection(db,"momente"),{
+      imageUrl,           // 🔒 validated URL
+      text,               // 🔒 trimmed + length-capped
+      eventDate,
+      createdAt: serverTimestamp()
     });
 
-    // Camera: shutter — async handler, share call is within this gesture
-    $('shutter-btn').addEventListener('click', () => {
-      Capture.shoot();
-    });
+    setProg(100); setStatus("✓ Gespeichert!");
+    lbl.textContent="💾 Speichern"; btn.disabled=false;
+    selectedFile=null;
+    ["file-gallery","file-camera"].forEach(id=>$(id).value="");
+    $("text-input").value=""; $("preview-thumb").style.display="none";
+    $("date-input").valueAsDate=new Date();
+    setTimeout(()=>{ setProg(0); setStatus(""); togglePanel(); setTimeout(scrollToEnd,500); },1400);
 
-    // Camera: load reference image
-    $('load-ref-btn').addEventListener('click', () => $('ref-input').click());
-    $('ref-input').addEventListener('change', e => {
-      Overlay.load(e.target.files[0]);
-      e.target.value = ''; // reset so same file can be reselected
-    });
-
-    // Camera: opacity slider
-    $('opacity-slider').addEventListener('input', e => {
-      Overlay.setOpacity(parseInt(e.target.value, 10));
-    });
-
-    // Camera: thumbnail tap → reshare last photo
-    $('last-photo-btn').addEventListener('click', () => Capture.reshareLastPhoto());
-
-    // Save fallback screen
-    $('save-back-btn').addEventListener('click', () => {
-      $('save-preview-img').src = '';
-      showScreen('screen-camera');
-    });
-
-    // "Teilen" button on fallback screen — retry share (works if user was on file://
-    // and has since navigated, or to try the system share sheet directly)
-    $('save-share-btn').addEventListener('click', async () => {
-      const dataUrl  = Capture.getLastDataUrl();
-      const filename = Capture.getLastFilename();
-      if (!dataUrl) return;
-      if (typeof navigator.share === 'function') {
-        try {
-          const blob = dataUrlToBlob(dataUrl);
-          const file = new File([blob], filename, { type: 'image/jpeg' });
-          await navigator.share({ files: [file], title: 'Timelapse Foto' });
-        } catch (err) {
-          if (err.name !== 'AbortError') {
-            UI.showToast('Teilen nicht verfügbar – bitte lang drücken');
-          }
-        }
-      } else {
-        UI.showToast('Bitte Bild lang gedrückt halten → "Bild sichern"');
-      }
-    });
+  }catch(err){
+    console.error(err); setStatus("❌ "+err.message);
+    lbl.textContent="Erneut versuchen"; btn.disabled=false; setProg(0);
   }
+};
 
-  return { init };
-})();
+function setProg(p){ $("prog-bar").style.width=p+"%"; }
+function setStatus(t){ $("status-msg").textContent=t; } // 🔒 textContent
 
-// Bootstrap
-App.init();
+/* ─── Confetti ─── */
+function launchConfetti(){
+  const colors=["#d4a574","#b07d55","#f4d5a0","#a8c8a0","#c0d4f0","#f0a0a0","#d4b0e0"];
+  for(let i=0;i<60;i++){
+    const c=document.createElement("div");
+    c.className="confetti-piece";
+    c.style.cssText=`left:${20+Math.random()*60}%;background:${colors[i%colors.length]};border-radius:${Math.random()>.5?"50%":"2px"};width:${6+Math.random()*8}px;height:${6+Math.random()*8}px;--dur:${1.2+Math.random()*.8}s;--delay:${Math.random()*.6}s;`;
+    document.body.appendChild(c);
+    c.addEventListener("animationend",()=>c.remove());
+  }
+}
+
+/* ─── Helpers ─── */
+window.togglePanel   = ()=>{ $("upload-panel").classList.toggle("open"); $("fab").classList.toggle("open"); };
+window.scrollToEnd   = ()=>$("timeline").scrollTo({left:$("timeline").scrollWidth,behavior:"smooth"});
+window.scrollToStart = ()=>$("timeline").scrollTo({left:0,behavior:"smooth"});
+
+document.addEventListener("touchmove",e=>{if(e.touches.length>1)e.preventDefault();},{passive:false});
+document.addEventListener("dblclick",e=>e.preventDefault(),{passive:false});
+
+function $(id){ return document.getElementById(id); }
 </script>
 </body>
 </html>
